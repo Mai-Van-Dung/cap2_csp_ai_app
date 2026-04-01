@@ -4,15 +4,24 @@
     "slug": "caps-ai-app",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
+    "plugins": [
+      "expo-router"
+    ],
     "assetBundlePatterns": [
       "**/*"
     ],
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2E7D8C"
+    },
     "ios": {
       "supportsTabletMode": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.capsaiapp"
