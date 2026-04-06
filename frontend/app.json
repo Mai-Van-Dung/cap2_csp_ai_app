@@ -4,9 +4,7 @@
     "slug": "caps-ai-app",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
-    "plugins": [
-      "expo-router"
-    ],
+    "plugins": [],
     "assetBundlePatterns": [
       "**/*"
     ],

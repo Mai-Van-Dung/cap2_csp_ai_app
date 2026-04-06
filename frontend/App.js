@@ -4,8 +4,11 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View } from 'react-native';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
-import LoginScreen from './src/screens/LoginScreen';
-import HomeScreen from './src/screens/HomeScreen';
+import LoginScreen   from './src/screens/LoginScreen';
+import HomeScreen    from './src/screens/HomeScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import AlertsScreen  from './src/screens/AlertsScreen';
+import CameraScreen  from './src/screens/CameraScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -21,12 +24,15 @@ function AppNavigator() {
   }
 
   return (
-    <Stack.Navigator 
+    <Stack.Navigator
       screenOptions={{ headerShown: false }}
-      initialRouteName={user ? "Home" : "Login"}
+      initialRouteName={user ? 'Home' : 'Login'}
     >
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="Login"   component={LoginScreen}   />
+      <Stack.Screen name="Home"    component={HomeScreen}    />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="Alerts"  component={AlertsScreen}  />
+      <Stack.Screen name="Camera"  component={CameraScreen}  />
     </Stack.Navigator>
   );
 }

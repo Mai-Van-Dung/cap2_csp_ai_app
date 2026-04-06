@@ -2,7 +2,7 @@
   "name": "caps-frontend",
   "version": "1.0.0",
   "description": "Frontend Expo React App with Tailwind CSS",
-  "main": "expo-router/entry",
+  "main": "index.js",
   "scripts": {
     "dev": "expo start",
     "start": "expo start --web",

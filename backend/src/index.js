@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");   
 const authRoutes = require("./routes/authRoutes");
 const bodyParser = require("body-parser");
 require("dotenv").config();
@@ -19,6 +20,10 @@ app.get("/", (req, res) => {
   res.json({ message: "CAPS AI App Backend API" });
 });
 app.use("/api/auth", authRoutes);
+
+const alertsRoutes = require('./routes/alertsRoutes');
+app.use('/api/alerts', alertsRoutes);
+app.use('/static', express.static(path.join(__dirname, '../static')));
 
 app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);

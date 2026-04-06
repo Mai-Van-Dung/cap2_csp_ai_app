@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://172.26.168.53:5000/api'; // phải đúng IP này// ⚠️ Thay YOUR_IP bằng IP máy tính (không dùng localhost trên thiết bị thật)
+const BASE_URL = 'http://192.168.10.95:5003/api';
 
-// ── Helper gọi API ──
+// ── Helper gọi API ────────────────────────────────────────
 const request = async (endpoint, method = 'GET', body = null, auth = false) => {
   const headers = { 'Content-Type': 'application/json' };
 
@@ -24,7 +24,7 @@ const request = async (endpoint, method = 'GET', body = null, auth = false) => {
   return data;
 };
 
-// ── Auth APIs ──
+// ── Auth APIs ─────────────────────────────────────────────
 export const authAPI = {
   login: (identifier, password) =>
     request('/auth/login', 'POST', { identifier, password }),
@@ -33,4 +33,13 @@ export const authAPI = {
     request('/auth/register', 'POST', { username, email, password, full_name }),
 
   getMe: () => request('/auth/me', 'GET', null, true),
+};
+
+// ── Alerts APIs ───────────────────────────────────────────
+export const alertsAPI = {
+  // Lấy toàn bộ danh sách alerts của user
+  getAll: () => request('/alerts', 'GET', null, true),
+
+  // Đánh dấu alert đã xử lý
+  resolve: (id) => request(`/alerts/${id}/resolve`, 'PATCH', null, true),
 };
