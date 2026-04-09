@@ -1,5 +1,5 @@
-const db = require('../database/db');
-const path = require('path');
+const db = require("../database/db");
+const path = require("path");
 
 // GET /api/alerts
 const getAlerts = async (req, res) => {
@@ -23,22 +23,23 @@ const getAlerts = async (req, res) => {
       LEFT JOIN zones z ON a.zone_id = z.id
       WHERE uca.user_id = ?
       ORDER BY a.created_at DESC`,
-      [userId]
+      [userId],
     );
 
-    // Thêm image_url đầy đủ cho từng alert
-    const BASE = process.env.BASE_URL || 'http://192.168.1.16:5003';
-    const data = rows.map(row => ({
+    // Dùng host thực tế để tránh lỗi khi đổi IP/LAN
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+    const BASE = process.env.BASE_URL || `${protocol}://${req.get("host")}`;
+    const data = rows.map((row) => ({
       ...row,
       image_url: row.image_path
-        ? `${BASE}/${row.image_path.replace(/\\/g, '/')}`
+        ? `${BASE}/${row.image_path.replace(/\\/g, "/")}`
         : null,
     }));
 
     res.json({ success: true, data });
   } catch (error) {
-    console.error('getAlerts error:', error);
-    res.status(500).json({ success: false, message: 'Lỗi server' });
+    console.error("getAlerts error:", error);
+    res.status(500).json({ success: false, message: "Lỗi server" });
   }
 };
 
@@ -52,18 +53,20 @@ const resolveAlert = async (req, res) => {
       `SELECT a.id FROM alerts a
        JOIN user_camera_access uca ON uca.camera_id = a.camera_id
        WHERE a.id = ? AND uca.user_id = ?`,
-      [id, userId]
+      [id, userId],
     );
 
     if (check.length === 0) {
-      return res.status(403).json({ success: false, message: 'Không có quyền truy cập' });
+      return res
+        .status(403)
+        .json({ success: false, message: "Không có quyền truy cập" });
     }
 
-    await db.query('UPDATE alerts SET is_resolved = TRUE WHERE id = ?', [id]);
-    res.json({ success: true, message: 'Đã xử lý cảnh báo' });
+    await db.query("UPDATE alerts SET is_resolved = TRUE WHERE id = ?", [id]);
+    res.json({ success: true, message: "Đã xử lý cảnh báo" });
   } catch (error) {
-    console.error('resolveAlert error:', error);
-    res.status(500).json({ success: false, message: 'Lỗi server' });
+    console.error("resolveAlert error:", error);
+    res.status(500).json({ success: false, message: "Lỗi server" });
   }
 };
 
