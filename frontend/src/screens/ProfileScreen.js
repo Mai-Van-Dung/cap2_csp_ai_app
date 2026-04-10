@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import BottomNav from '../components/BottomNav';
 
@@ -55,13 +55,11 @@ export default function ProfileScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={BG} />
 
-      {/* ── HEADER ─────────────────────────────────────── */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Tài khoản</Text>
       </View>
 
       <View style={styles.body}>
-        {/* ── Thông tin người dùng ── */}
         <View style={styles.card}>
           <View style={styles.headerRow}>
             <View style={styles.avatar}>
@@ -72,14 +70,11 @@ export default function ProfileScreen({ navigation }) {
                 {user?.full_name || user?.username || 'Unknown user'}
               </Text>
               <Text style={styles.meta}>{user?.email || 'Chưa có email'}</Text>
-              <Text style={styles.meta}>
-                Vai trò: {user?.role || 'viewer'}
-              </Text>
+              <Text style={styles.meta}>Vai trò: {user?.role || 'viewer'}</Text>
             </View>
           </View>
         </View>
 
-        {/* ── Cài đặt ── */}
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>Cài đặt</Text>
           <TouchableOpacity style={styles.menuItem}>
@@ -93,13 +88,11 @@ export default function ProfileScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* ── Đăng xuất ── */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
       </View>
 
-      {/* ── BOTTOM NAV ─────────────────────────────────── */}
       <BottomNav
         navigation={navigation}
         activeTab="Profile"
@@ -111,7 +104,6 @@ export default function ProfileScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-
   header: {
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -120,9 +112,7 @@ const styles = StyleSheet.create({
     borderBottomColor: BORDER,
   },
   headerTitle: { fontSize: 20, fontWeight: '800', color: TEXT1 },
-
   body: { flex: 1, padding: 20 },
-
   card: {
     backgroundColor: '#fff',
     padding: 16,
@@ -135,7 +125,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-
   headerRow:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: {
     width: 56, height: 56, borderRadius: 28,
@@ -145,11 +134,7 @@ const styles = StyleSheet.create({
   avatarText: { color: '#fff', fontWeight: '800', fontSize: 20 },
   name:       { fontSize: 18, fontWeight: '700', color: TEXT1 },
   meta:       { color: TEXT2, marginTop: 4, fontSize: 13 },
-
-  sectionLabel: {
-    fontWeight: '700', color: TEXT1,
-    marginBottom: 12, fontSize: 14,
-  },
+  sectionLabel: { fontWeight: '700', color: TEXT1, marginBottom: 12, fontSize: 14 },
   menuItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -159,7 +144,6 @@ const styles = StyleSheet.create({
   menuItemText:  { fontSize: 14, color: TEXT1 },
   menuItemArrow: { fontSize: 20, color: '#CBD5E1' },
   divider:       { height: 1, backgroundColor: BORDER },
-
   logoutBtn: {
     backgroundColor: '#EF4444',
     padding: 14,

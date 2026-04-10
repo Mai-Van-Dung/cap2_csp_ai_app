@@ -1,20 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-  Alert,
-  Image,
-  Modal,
-  Dimensions,
-  Platform,
-} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { io } from "socket.io-client";
 import { useAuth } from "../context/AuthContext";
@@ -25,6 +10,11 @@ import {
   getSocketBaseCandidates,
 } from "../config/endpoints";
 import BottomNav from "../components/BottomNav";
+import {
+  View, Text, StyleSheet, StatusBar, FlatList, TouchableOpacity,
+  ActivityIndicator, RefreshControl, Alert, Image, Modal,
+  Dimensions, Platform,
+} from "react-native";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
@@ -149,24 +139,24 @@ const AlertItem = ({ item, onResolve }) => {
       )}
 
       {/* ── Info ── */}
-      <View style={styles.alertBody}>
-        <View style={styles.alertHeader}>
-          <View style={styles.alertHeaderLeft}>
-            {!displayImageUri && (
-              <View style={[styles.badge, { backgroundColor: severity.bg }]}>
-                <Text style={[styles.badgeText, { color: severity.fg }]}>
-                  {severity.label}
-                </Text>
-              </View>
-            )}
-            {item.is_resolved && (
-              <View style={styles.resolvedBadge}>
-                <Text style={styles.resolvedText}>Đã xử lý</Text>
-              </View>
-            )}
-          </View>
-          <Text style={styles.alertTime}>{formatTime(item.created_at)}</Text>
+<View style={styles.alertBody}>
+  <View style={styles.alertHeader}>
+    <View style={styles.alertHeaderLeft}>
+      {!displayImageUri ? (
+        <View style={[styles.badge, { backgroundColor: severity.bg }]}>
+          <Text style={[styles.badgeText, { color: severity.fg }]}>
+            {severity.label}
+          </Text>
         </View>
+      ) : null}
+      {item.is_resolved ? (
+        <View style={styles.resolvedBadge}>
+          <Text style={styles.resolvedText}>Đã xử lý</Text>
+        </View>
+      ) : null}
+    </View>
+    <Text style={styles.alertTime}>{formatTime(item.created_at)}</Text>
+  </View>
 
         <Text style={styles.alertTitle}>
           Phát hiện: {item.object_type || "Đối tượng lạ"}

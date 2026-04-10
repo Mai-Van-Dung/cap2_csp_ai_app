@@ -1,8 +1,9 @@
 import React from 'react';
 import {
   View, Text, StyleSheet,
-  SafeAreaView, StatusBar, TouchableOpacity,
+ StatusBar, TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import BottomNav from '../components/BottomNav';
 

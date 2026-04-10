@@ -6,19 +6,10 @@ import React, {
   useState,
 } from "react";
 import {
-  Animated,
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  Modal,
-  Alert,
-  Platform,
+  Animated, View, Text, Image, StyleSheet, ScrollView,
+  TouchableOpacity, StatusBar, Modal, Alert, Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { io } from "socket.io-client";
 import { useAuth } from "../context/AuthContext";

@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-const DEFAULT_LAN_HOSTS = ["192.168.1.8", "192.168.1.10", "192.168.1.100"];
+const DEFAULT_LAN_HOSTS = ["192.168.1.15", "192.168.1.10", "192.168.1.100"];
 export const DEFAULT_SOCKET_PORT = 5000;
 
 const readEnv = (...keys) => {
