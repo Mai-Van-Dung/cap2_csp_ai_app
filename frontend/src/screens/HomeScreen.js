@@ -23,6 +23,11 @@ import { WebView } from "react-native-webview";
 import { io } from "socket.io-client";
 import { useAuth } from "../context/AuthContext";
 import { alertsAPI } from "../services/api";
+import {
+  getCameraBaseCandidates,
+  getSocketBaseCandidates,
+  getViewerUrl,
+} from "../config/endpoints";
 import BottomNav from "../components/BottomNav";
 
 const TEAL = "#2E7D8C";
@@ -32,11 +37,6 @@ const TEXT1 = "#0F172A";
 const TEXT2 = "#475569";
 const TEXT3 = "#94A3B8";
 const BORDER = "#E5E7EB";
-const CAMERA_PORT = 5000;
-const SOCKET_PORT = 5000;
-const LAN_HOSTS = ["192.168.1.8", "192.168.1.10", "192.168.1.100"];
-const LOCAL_HOSTS = ["localhost", "127.0.0.1"];
-const CAMERA_HOSTS = [...LAN_HOSTS, ...LOCAL_HOSTS];
 const ALERT_MESSAGE = "PHAT HIEN TRE EM XAM NHAP!";
 const ALERT_BUTTON_IDLE = "#16A34A";
 const ALERT_BUTTON_ACTIVE = "#DC2626";
@@ -118,12 +118,7 @@ export default function HomeScreen({ navigation }) {
   const toastTimerRef = useRef(null);
 
   const cameraCandidates = useMemo(() => {
-    const hosts = [...CAMERA_HOSTS];
-    if (Platform.OS === "web" && typeof window !== "undefined") {
-      const currentHost = window.location?.hostname;
-      if (currentHost) hosts.unshift(currentHost);
-    }
-    return [...new Set(hosts)].map((host) => `http://${host}:${CAMERA_PORT}`);
+    return getCameraBaseCandidates();
   }, []);
 
   const socketOptions = useMemo(() => {
@@ -146,29 +141,7 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   const socketCandidates = useMemo(() => {
-    const hosts = [];
-
-    if (cameraBaseUrl) {
-      try {
-        const hostname = new URL(cameraBaseUrl).hostname;
-        if (hostname) hosts.push(hostname);
-      } catch (error) {
-        // Ignore invalid URL and keep static host fallback list.
-      }
-    }
-
-    if (Platform.OS === "web" && typeof window !== "undefined") {
-      const currentHost = window.location?.hostname;
-      if (currentHost) hosts.push(currentHost);
-
-      if (currentHost === "localhost" || currentHost === "127.0.0.1") {
-        hosts.push(...LOCAL_HOSTS);
-      }
-    } else {
-      hosts.push(...LAN_HOSTS, ...LOCAL_HOSTS);
-    }
-
-    return [...new Set(hosts)].map((host) => `http://${host}:${SOCKET_PORT}`);
+    return getSocketBaseCandidates();
   }, [cameraBaseUrl]);
 
   const showIntrusionToast = useCallback(() => {
@@ -247,7 +220,7 @@ export default function HomeScreen({ navigation }) {
       }
 
       setCameraError(
-        "Không kết nối được camera server (Flask) trên cổng 5000.",
+        "Không kết nối được camera server (Flask) trên cổng đã cấu hình.",
       );
       setCameraLoading(false);
     };
@@ -356,7 +329,7 @@ export default function HomeScreen({ navigation }) {
   }, [toastAnim]);
 
   const viewerUrl = cameraBaseUrl
-    ? `${cameraBaseUrl}/viewer/camera?label=Camera%20chinh`
+    ? getViewerUrl(cameraBaseUrl, "Camera chinh")
     : null;
 
   const requireAuth = (action) => {
@@ -505,7 +478,7 @@ export default function HomeScreen({ navigation }) {
                 {!cameraLoading && (
                   <Text style={styles.cameraStateHint}>
                     Kiểm tra Flask app đang chạy và mở route /viewer/camera ở
-                    cổng 5000.
+                    cổng đã cấu hình.
                   </Text>
                 )}
               </View>

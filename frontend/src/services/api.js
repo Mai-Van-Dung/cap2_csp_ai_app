@@ -1,20 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Platform } from "react-native";
+import { getApiBaseCandidates } from "../config/endpoints";
 
-const API_PORT = 5003;
-const STATIC_HOSTS = ["192.168.1.8", "192.168.1.10", "localhost", "127.0.0.1"];
 let preferredBaseUrl = null;
-
-const getCandidateBaseUrls = () => {
-  const hosts = [...STATIC_HOSTS];
-
-  if (Platform.OS === "web" && typeof window !== "undefined") {
-    const currentHost = window.location?.hostname;
-    if (currentHost) hosts.unshift(currentHost);
-  }
-
-  return [...new Set(hosts)].map((host) => `http://${host}:${API_PORT}/api`);
-};
 
 const fetchWithTimeout = async (url, options, timeoutMs = 8000) => {
   const controller = new AbortController();
@@ -42,9 +29,9 @@ const request = async (endpoint, method = "GET", body = null, auth = false) => {
   const candidates = preferredBaseUrl
     ? [
         preferredBaseUrl,
-        ...getCandidateBaseUrls().filter((u) => u !== preferredBaseUrl),
+        ...getApiBaseCandidates().filter((u) => u !== preferredBaseUrl),
       ]
-    : getCandidateBaseUrls();
+    : getApiBaseCandidates();
 
   let lastNetworkError = null;
 
@@ -84,7 +71,7 @@ const request = async (endpoint, method = "GET", body = null, auth = false) => {
   }
 
   throw new Error(
-    "Không thể kết nối backend. Kiểm tra IP LAN, cổng 5003 và firewall.",
+    "Không thể kết nối backend. Kiểm tra IP LAN, cổng API và firewall.",
   );
 };
 

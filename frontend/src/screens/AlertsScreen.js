@@ -19,6 +19,11 @@ import { useFocusEffect } from "@react-navigation/native";
 import { io } from "socket.io-client";
 import { useAuth } from "../context/AuthContext";
 import { alertsAPI } from "../services/api";
+import {
+  getAlertImageCandidates,
+  getSocketOriginFromHostname,
+  getSocketBaseCandidates,
+} from "../config/endpoints";
 import BottomNav from "../components/BottomNav";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -30,10 +35,6 @@ const TEXT1 = "#0F172A";
 const TEXT2 = "#475569";
 const TEXT3 = "#94A3B8";
 const BORDER = "#E5E7EB";
-const SOCKET_PORT = 5000;
-const LAN_HOSTS = ["192.168.1.8", "192.168.1.10", "192.168.1.100"];
-const LOCAL_HOSTS = ["localhost", "127.0.0.1"];
-const IMAGE_PORTS = [5003, 5000];
 
 // ── Helpers ───────────────────────────────────────────────
 const getSeverity = (confidence) => {
@@ -51,46 +52,6 @@ const formatTime = (isoString) => {
   if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
   return date.toLocaleDateString("vi-VN");
-};
-
-const toAbsoluteImageCandidates = (item) => {
-  const candidates = [];
-
-  if (Array.isArray(item?.image_urls)) {
-    candidates.push(...item.image_urls.filter(Boolean));
-  }
-
-  if (item?.image_url) {
-    candidates.push(item.image_url);
-  }
-
-  const rawPath = (item?.image_path || "")
-    .replace(/\\/g, "/")
-    .replace(/^\/+/, "");
-
-  if (!rawPath) return [...new Set(candidates)];
-
-  const hosts = [];
-  if (Platform.OS === "web" && typeof window !== "undefined") {
-    const currentHost = window.location?.hostname;
-    if (currentHost) hosts.push(currentHost);
-  }
-  hosts.push(...LAN_HOSTS, ...LOCAL_HOSTS);
-
-  const pathVariants = [rawPath];
-  if (!rawPath.startsWith("static/")) {
-    pathVariants.push(`static/${rawPath}`);
-  }
-
-  for (const host of [...new Set(hosts)]) {
-    for (const port of IMAGE_PORTS) {
-      for (const relPath of pathVariants) {
-        candidates.push(`http://${host}:${port}/${relPath}`);
-      }
-    }
-  }
-
-  return [...new Set(candidates)];
 };
 
 // ── Image viewer modal ────────────────────────────────────
@@ -124,7 +85,7 @@ const ImageViewer = ({ uri, visible, onClose }) => (
 const AlertItem = ({ item, onResolve }) => {
   const severity = getSeverity(item.confidence);
   const imageCandidates = React.useMemo(
-    () => toAbsoluteImageCandidates(item),
+    () => getAlertImageCandidates(item),
     [item],
   );
   const [imageIndex, setImageIndex] = useState(0);
@@ -287,24 +248,16 @@ export default function AlertsScreen({ navigation }) {
   }, []);
 
   const socketCandidates = React.useMemo(() => {
-    const hosts = [];
-
-    if (socketHostHint) hosts.push(socketHostHint);
-
-    if (Platform.OS === "web" && typeof window !== "undefined") {
-      const currentHost = window.location?.hostname;
-      if (currentHost && !socketHostHint) hosts.push(currentHost);
-
-      if (
-        !socketHostHint &&
-        (currentHost === "localhost" || currentHost === "127.0.0.1")
-      ) {
-        hosts.push(...LOCAL_HOSTS);
+    if (socketHostHint) {
+      try {
+        const parsed = new URL(socketHostHint);
+        return [parsed.origin];
+      } catch (error) {
+        return [getSocketOriginFromHostname(socketHostHint)];
       }
-    } else {
-      hosts.push(...LAN_HOSTS, ...LOCAL_HOSTS);
     }
-    return [...new Set(hosts)].map((host) => `http://${host}:${SOCKET_PORT}`);
+
+    return getSocketBaseCandidates();
   }, [socketHostHint]);
 
   const requireAuth = (action) => {

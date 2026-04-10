@@ -1,5 +1,26 @@
 const db = require("../database/db");
-const path = require("path");
+
+const normalizeBaseUrl = (value) => value.replace(/\/+$/, "");
+
+const getPublicBaseUrl = (req) => {
+  const configured = process.env.PUBLIC_BASE_URL || process.env.BASE_URL;
+  if (configured) {
+    return normalizeBaseUrl(configured);
+  }
+
+  const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+  return normalizeBaseUrl(`${protocol}://${req.get("host")}`);
+};
+
+const buildImageUrls = (baseUrl, imagePath) => {
+  const normalizedPath = imagePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  const candidates = [
+    `${baseUrl}/static/${normalizedPath}`,
+    `${baseUrl}/${normalizedPath}`,
+  ];
+
+  return [...new Set(candidates)];
+};
 
 // GET /api/alerts
 const getAlerts = async (req, res) => {
@@ -26,13 +47,12 @@ const getAlerts = async (req, res) => {
       [userId],
     );
 
-    // Dùng host thực tế để tránh lỗi khi đổi IP/LAN
-    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
-    const BASE = process.env.BASE_URL || `${protocol}://${req.get("host")}`;
+    const baseUrl = getPublicBaseUrl(req);
     const data = rows.map((row) => ({
       ...row,
+      image_urls: row.image_path ? buildImageUrls(baseUrl, row.image_path) : [],
       image_url: row.image_path
-        ? `${BASE}/${row.image_path.replace(/\\/g, "/")}`
+        ? buildImageUrls(baseUrl, row.image_path)[0]
         : null,
     }));
 
