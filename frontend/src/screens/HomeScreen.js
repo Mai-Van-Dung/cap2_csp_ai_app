@@ -421,7 +421,7 @@ export default function HomeScreen({ navigation }) {
         {user ? (
           <TouchableOpacity style={styles.userRow} onPress={() => setShowMenu(true)} activeOpacity={0.8}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initial}</Text>
+              <Text style={styles.avatarText}>{initial ?? 'U'}</Text>
             </View>
           </TouchableOpacity>
         ) : (
@@ -433,15 +433,17 @@ export default function HomeScreen({ navigation }) {
         <Modal transparent animationType="fade" visible={showMenu} onRequestClose={() => setShowMenu(false)}>
           <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
             <View style={styles.dropdownMenu}>
-              <View style={styles.dropdownUser}>
-                <View style={styles.dropdownAvatar}>
-                  <Text style={styles.dropdownAvatarText}>{initial}</Text>
-                </View>
-                <View>
-                  <Text style={styles.dropdownUserName}>{user?.full_name || user?.username}</Text>
-                  <Text style={styles.dropdownUserEmail}>{user?.email}</Text>
-                </View>
-              </View>
+<View style={styles.dropdownUser}>
+  <View style={styles.dropdownAvatar}>
+    <Text style={styles.dropdownAvatarText}>{initial ?? 'U'}</Text>
+  </View>
+  <View>
+    <Text style={styles.dropdownUserName}>
+      {user?.full_name || user?.username || ''}
+    </Text>
+    <Text style={styles.dropdownUserEmail}>{user?.email || ''}</Text>
+  </View>
+</View>
               <View style={styles.dropdownDivider} />
               <TouchableOpacity style={styles.dropdownItem} onPress={handleLogout}>
                 <Text style={styles.dropdownItemText}>{'Đăng xuất'}</Text>

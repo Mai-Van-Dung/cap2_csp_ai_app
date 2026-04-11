@@ -84,7 +84,7 @@ export default function LoginScreen({ navigation }) {
         {/* Logo */}
         <View style={styles.logoWrap}>
           <View style={styles.logoBox}>
-            <Text style={styles.logoEmoji}>🎥</Text>
+            <Text style={[styles.logoEmoji, { lineHeight: 44 }]}>{'🎥'}</Text>
           </View>
         </View>
 
@@ -99,9 +99,7 @@ export default function LoginScreen({ navigation }) {
               style={styles.tabBtn}
               onPress={() => setActiveTab(tab)}
             >
-              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                {tab === 'login' ? 'Đăng Nhập' : 'Đăng Kí'}
-              </Text>
+<Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab === 'login' ? 'Đăng Nhập' : 'Đăng Kí'}</Text>
               {activeTab === tab && <View style={styles.tabUnderline} />}
             </TouchableOpacity>
           ))}
@@ -131,30 +129,30 @@ export default function LoginScreen({ navigation }) {
                 onChangeText={setPassword}
                 secureTextEntry={!showPass}
               />
-              <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPass(!showPass)}>
-                <Text style={styles.eyeIcon}>{showPass ? '👁️' : '🙈'}</Text>
-              </TouchableOpacity>
+<TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPass(!showPass)}>
+  <Text style={styles.eyeIcon}>{showPass ? '👁' : '🙈'}</Text>
+</TouchableOpacity>
             </View>
 
             <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin} disabled={loading}>
               {loading
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.primaryBtnText}>Đăng nhập</Text>
+                : <Text style={styles.primaryBtnText}>{'Đăng nhập'}</Text>
               }
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.forgotWrap}>
-              <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+              <Text style={styles.forgotText}>{'Quên mật khẩu?'}</Text>
             </TouchableOpacity>
 
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>Hoặc</Text>
-              <View style={styles.dividerLine} />
-            </View>
+<View style={styles.dividerRow}>
+  <View style={styles.dividerLine} />
+  <Text style={styles.dividerText}>{'Hoặc'}</Text>
+  <View style={styles.dividerLine} />
+</View>
 
             <TouchableOpacity onPress={() => setActiveTab('register')}>
-              <Text style={styles.createAccountText}>Tạo tài khoản mới</Text>
+              <Text style={styles.createAccountText}>{'Tạo tài khoản mới'}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -202,9 +200,9 @@ export default function LoginScreen({ navigation }) {
                 onChangeText={setRegPassword}
                 secureTextEntry={!showRegPass}
               />
-              <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowRegPass(!showRegPass)}>
-                <Text style={styles.eyeIcon}>{showRegPass ? '👁️' : '🙈'}</Text>
-              </TouchableOpacity>
+<TouchableOpacity style={styles.eyeBtn} onPress={() => setShowRegPass(!showRegPass)}>
+  <Text style={styles.eyeIcon}>{showRegPass ? '👁' : '🙈'}</Text>
+</TouchableOpacity>
             </View>
 
             <Text style={styles.label}>Xác nhận mật khẩu *</Text>
@@ -220,18 +218,18 @@ export default function LoginScreen({ navigation }) {
             <TouchableOpacity style={styles.primaryBtn} onPress={handleRegister} disabled={loading}>
               {loading
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.primaryBtnText}>Đăng kí</Text>
+                : <Text style={styles.primaryBtnText}>{'Đăng kí'}</Text>
               }
             </TouchableOpacity>
 
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>Hoặc</Text>
-              <View style={styles.dividerLine} />
-            </View>
+<View style={styles.dividerRow}>
+  <View style={styles.dividerLine} />
+  <Text style={styles.dividerText}>{'Hoặc'}</Text>
+  <View style={styles.dividerLine} />
+</View>
 
             <TouchableOpacity onPress={() => setActiveTab('login')}>
-              <Text style={styles.createAccountText}>Đã có tài khoản? Đăng nhập</Text>
+              <Text style={styles.createAccountText}>{'Đã có tài khoản? Đăng nhập'}</Text>
             </TouchableOpacity>
           </View>
         )}

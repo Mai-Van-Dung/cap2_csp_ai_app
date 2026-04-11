@@ -111,7 +111,9 @@ export default function ProfileScreen({ navigation }) {
             <Text style={styles.avatarLargeText}>{initial}</Text>
           </View>
           <Text style={styles.heroName}>{displayName}</Text>
-          <Text style={styles.heroEmail}>{user?.email || ''}</Text>
+          {user?.email ? (
+  <Text style={styles.heroEmail}>{user.email}</Text>
+) : null}
           <View style={styles.rolePill}>
             <Text style={styles.roleText}>{user?.role || 'viewer'}</Text>
           </View>
@@ -207,9 +209,8 @@ export default function ProfileScreen({ navigation }) {
                     style={styles.editBtn}
                     onPress={() => setEditing(true)}
                   >
-                    <Text style={styles.editBtnText}>
-                      {telegramId ? 'Sửa' : 'Thêm'}
-                    </Text>
+<Text style={styles.editBtnText}>{telegramId ? 'Sửa' : 'Thêm'}</Text>
+
                   </TouchableOpacity>
                 </View>
               )}
@@ -301,7 +302,7 @@ const InfoRow = ({ label, value }) => (
 
 const MenuRow = ({ label, onPress }) => (
   <TouchableOpacity style={styles.menuRow} onPress={onPress} activeOpacity={0.7}>
-    <Text style={styles.menuRowText}>{label}</Text>
+    <Text style={styles.menuRowText}>{String(label)}</Text>
     <Text style={styles.menuRowArrow}>{'›'}</Text>
   </TouchableOpacity>
 );

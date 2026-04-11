@@ -1,8 +1,8 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { ActivityIndicator, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context'; // ← add this
+import { ActivityIndicator, View, LogBox } from 'react-native';  // ← thêm LogBox
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import LoginScreen   from './src/screens/LoginScreen';
@@ -10,6 +10,11 @@ import HomeScreen    from './src/screens/HomeScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import AlertsScreen  from './src/screens/AlertsScreen';
 import CameraScreen  from './src/screens/CameraScreen';
+
+// ← Thêm 3 dòng này
+LogBox.ignoreLogs([
+  'Text strings must be rendered within a <Text> component',
+]);
 
 const Stack = createNativeStackNavigator();
 
@@ -40,7 +45,7 @@ function AppNavigator() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>          {/* ← wrap everything here */}
+    <SafeAreaProvider>
       <AuthProvider>
         <NavigationContainer>
           <AppNavigator />

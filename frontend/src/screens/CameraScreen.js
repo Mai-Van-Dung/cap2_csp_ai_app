@@ -54,8 +54,8 @@ export default function CameraScreen({ navigation }) {
 
       {/* ── HEADER ─────────────────────────────────────── */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Camera</Text>
-        <Text style={styles.headerSubtitle}>Quản lý thiết bị camera</Text>
+       <Text style={styles.headerTitle}>{'Camera'}</Text>
+        <Text style={styles.headerSubtitle}>{'Quản lý thiết bị camera'}</Text>
       </View>
 
       {/* ── BODY ───────────────────────────────────────── */}
@@ -64,13 +64,13 @@ export default function CameraScreen({ navigation }) {
         <View style={styles.feedCard}>
           <View style={styles.feedFrame}>
             <IconCamera size={64} color="#bbb" />
-            <Text style={styles.feedLabel}>Camera chính · Ngoài cửa</Text>
+            <Text style={styles.feedLabel}>{'Camera chính · Ngoài cửa'}</Text>
           </View>
           <View style={styles.feedFooter}>
             <View style={styles.statusDot} />
-            <Text style={styles.statusText}>Online</Text>
+           <Text style={styles.statusText}>{'Online'}</Text>
             <TouchableOpacity style={styles.fullscreenBtn}>
-              <Text style={styles.fullscreenText}>Xem toàn màn hình</Text>
+             <Text style={styles.fullscreenText}>{'Xem toàn màn hình'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -81,8 +81,8 @@ export default function CameraScreen({ navigation }) {
           onPress={() => requireAuth(() => {})}
           activeOpacity={0.8}
         >
-          <Text style={styles.addBtnPlus}>+</Text>
-          <Text style={styles.addBtnText}>Thêm thiết bị</Text>
+          <Text style={styles.addBtnPlus}>{'+'}</Text>
+          <Text style={styles.addBtnText}>{'Thêm thiết bị'}</Text>
         </TouchableOpacity>
       </View>
 
