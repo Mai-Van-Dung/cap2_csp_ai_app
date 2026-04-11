@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiBaseCandidates } from "../config/endpoints";
 
+
 let preferredBaseUrl = null;
 
 const fetchWithTimeout = async (url, options, timeoutMs = 8000) => {
@@ -93,4 +94,15 @@ export const alertsAPI = {
 
   // Đánh dấu alert đã xử lý
   resolve: (id) => request(`/alerts/${id}/resolve`, "PATCH", null, true),
+};
+
+// ── Telegram APIs ─────────────────────────────────────────
+export const telegramAPI = {
+  // Lưu Chat ID lên backend
+  saveChatId: (chatId) =>
+    request('/telegram/chat-id', 'POST', { chat_id: chatId }, true),
+
+  // Gửi tin nhắn test
+  sendTest: (chatId) =>
+    request('/telegram/test', 'POST', { chat_id: chatId }, true),
 };

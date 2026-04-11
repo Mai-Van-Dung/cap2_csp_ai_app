@@ -18,68 +18,53 @@ import {
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
-const TEAL = "#2E7D8C";
-const BG = "#F7F9FC";
-const SURF = "#FFFFFF";
-const TEXT1 = "#0F172A";
-const TEXT2 = "#475569";
-const TEXT3 = "#94A3B8";
-const BORDER = "#E5E7EB";
+const TEAL    = "#2E7D8C";
+const BG      = "#F0F4F8";       // nền tổng thể xám xanh nhạt
+const SURF    = "#FFFFFF";       // card trắng
+const SURF2   = "#F1F5F9";       // nền phụ
+const TEXT1   = "#0F172A";       // chữ đậm
+const TEXT2   = "#475569";       // chữ phụ
+const TEXT3   = "#94A3B8";       // chữ mờ
+const BORDER  = "#E2E8F0";       // viền
+const ACCENT  = "#EF4444";
 
 // ── Helpers ───────────────────────────────────────────────
 const getSeverity = (confidence) => {
-  if (confidence >= 0.8) return { label: "Cao", bg: "#FEE2E2", fg: "#B91C1C" };
-  if (confidence >= 0.5)
-    return { label: "Trung bình", bg: "#FEF3C7", fg: "#B45309" };
-  return { label: "Thấp", bg: "#DCFCE7", fg: "#15803D" };
+  if (confidence >= 0.8) return { label: "NGUY HIỂM CAO", color: "#EF4444", bar: "#EF4444" };
+  if (confidence >= 0.5) return { label: "TRUNG BÌNH",    color: "#F59E0B", bar: "#F59E0B" };
+  return                        { label: "THẤP",           color: "#22C55E", bar: "#22C55E" };
 };
 
 const formatTime = (isoString) => {
   const date = new Date(isoString);
-  const now = new Date();
+  const now  = new Date();
   const diff = Math.floor((now - date) / 1000);
-  if (diff < 60) return `${diff} giây trước`;
-  if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
+  if (diff < 60)    return `${diff} giây trước`;
+  if (diff < 3600)  return `${Math.floor(diff / 60)} phút trước`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
   return date.toLocaleDateString("vi-VN");
 };
 
-// ── Image viewer modal ────────────────────────────────────
+// ── Image Viewer ──────────────────────────────────────────
 const ImageViewer = ({ uri, visible, onClose }) => (
-  <Modal
-    visible={visible}
-    transparent
-    animationType="fade"
-    onRequestClose={onClose}
-  >
-    <TouchableOpacity
-      style={styles.imgViewerOverlay}
-      activeOpacity={1}
-      onPress={onClose}
-    >
+  <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <TouchableOpacity style={styles.imgViewerOverlay} activeOpacity={1} onPress={onClose}>
       <View style={styles.imgViewerBox}>
-        <Image
-          source={{ uri }}
-          style={styles.imgViewerImg}
-          resizeMode="contain"
-        />
+        <Image source={{ uri }} style={styles.imgViewerImg} resizeMode="contain" />
         <TouchableOpacity style={styles.imgViewerClose} onPress={onClose}>
-          <Text style={styles.imgViewerCloseText}>✕</Text>
+          <Text style={styles.imgViewerCloseText}>{'✕'}</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
   </Modal>
 );
 
-// ── Alert Item ────────────────────────────────────────────
-const AlertItem = ({ item, onResolve }) => {
-  const severity = getSeverity(item.confidence);
-  const imageCandidates = React.useMemo(
-    () => getAlertImageCandidates(item),
-    [item],
-  );
+// ── Alert Card ────────────────────────────────────────────
+const AlertItem = ({ item }) => {
+  const severity       = getSeverity(item.confidence);
+  const imageCandidates = React.useMemo(() => getAlertImageCandidates(item), [item]);
   const [imageIndex, setImageIndex] = useState(0);
-  const [viewing, setViewing] = useState(false);
+  const [viewing, setViewing]       = useState(false);
   const displayImageUri = imageCandidates[imageIndex] || null;
 
   useEffect(() => {
@@ -87,166 +72,108 @@ const AlertItem = ({ item, onResolve }) => {
   }, [item.id, item.image_url, item.image_urls, item.image_path]);
 
   const handleImageError = useCallback(() => {
-    setImageIndex((prev) => {
-      if (prev >= imageCandidates.length - 1) return prev;
-      return prev + 1;
-    });
+    setImageIndex((prev) => (prev >= imageCandidates.length - 1 ? prev : prev + 1));
   }, [imageCandidates.length]);
 
+  const confidencePct = Math.round((item.confidence || 0) * 100);
+
   return (
-    <View
-      style={[styles.alertCard, item.is_resolved && styles.alertCardResolved]}
-    >
-      {/* ── Ảnh thumbnail ── */}
-      {displayImageUri ? (
-        <TouchableOpacity activeOpacity={0.85} onPress={() => setViewing(true)}>
-          <Image
-            source={{ uri: displayImageUri }}
-            style={styles.alertImage}
-            resizeMode="cover"
-            onError={handleImageError}
-          />
-          {/* Overlay badge LIVE-like */}
-          <View style={styles.imgOverlay}>
-            <View
-              style={[
-                styles.imgSeverityBadge,
-                { backgroundColor: severity.bg },
-              ]}
-            >
-              <Text style={[styles.imgSeverityText, { color: severity.fg }]}>
+    <View style={styles.card}>
+      {/* Thanh màu severity bên trái */}
+      <View style={[styles.cardAccentBar, { backgroundColor: severity.color }]} />
+
+      <View style={styles.cardInner}>
+        {/* Ảnh */}
+        {displayImageUri ? (
+          <TouchableOpacity activeOpacity={0.9} onPress={() => setViewing(true)}>
+            <View style={styles.imageWrapper}>
+              <Image
+                source={{ uri: displayImageUri }}
+                style={styles.alertImage}
+                resizeMode="cover"
+                onError={handleImageError}
+              />
+              <View style={styles.imageOverlay}>
+                <Text style={styles.imageTap}>{'Nhấn để phóng to'}</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.noImageBox}>
+            <Text style={styles.noImageText}>{'Không có hình ảnh'}</Text>
+          </View>
+        )}
+
+        {displayImageUri && (
+          <ImageViewer uri={displayImageUri} visible={viewing} onClose={() => setViewing(false)} />
+        )}
+
+        {/* Thông tin */}
+        <View style={styles.cardBody}>
+          {/* Hàng trên: severity label + thời gian */}
+          <View style={styles.cardTopRow}>
+            <View style={[styles.severityPill, { borderColor: severity.color }]}>
+              <View style={[styles.severityDot, { backgroundColor: severity.color }]} />
+              <Text style={[styles.severityLabel, { color: severity.color }]}>
                 {severity.label}
               </Text>
             </View>
-            <Text style={styles.imgTapHint}>Nhấn để phóng to</Text>
+            <Text style={styles.timeText}>{formatTime(item.created_at)}</Text>
           </View>
-        </TouchableOpacity>
-      ) : (
-        /* Placeholder khi không có ảnh */
-        <View style={styles.alertImagePlaceholder}>
-          <Text style={styles.alertImagePlaceholderIcon}>📷</Text>
-          <Text style={styles.alertImagePlaceholderText}>Không có ảnh</Text>
-        </View>
-      )}
 
-      {/* ── Image viewer ── */}
-      {displayImageUri && (
-        <ImageViewer
-          uri={displayImageUri}
-          visible={viewing}
-          onClose={() => setViewing(false)}
-        />
-      )}
-
-      {/* ── Info ── */}
-<View style={styles.alertBody}>
-  <View style={styles.alertHeader}>
-    <View style={styles.alertHeaderLeft}>
-      {!displayImageUri ? (
-        <View style={[styles.badge, { backgroundColor: severity.bg }]}>
-          <Text style={[styles.badgeText, { color: severity.fg }]}>
-            {severity.label}
+          {/* Tên đối tượng */}
+          <Text style={styles.objectTitle}>
+            {item.object_type || 'Đối tượng không xác định'}
           </Text>
-        </View>
-      ) : null}
-      {item.is_resolved ? (
-        <View style={styles.resolvedBadge}>
-          <Text style={styles.resolvedText}>Đã xử lý</Text>
-        </View>
-      ) : null}
-    </View>
-    <Text style={styles.alertTime}>{formatTime(item.created_at)}</Text>
-  </View>
 
-        <Text style={styles.alertTitle}>
-          Phát hiện: {item.object_type || "Đối tượng lạ"}
-        </Text>
-        <Text style={styles.alertMeta}>
-          {item.camera_name}
-          {item.zone_name ? ` · ${item.zone_name}` : ""}
-        </Text>
-        <Text style={styles.alertConfidence}>
-          Độ chính xác: {Math.round((item.confidence || 0) * 100)}%
-        </Text>
+          {/* Camera + zone */}
+          <Text style={styles.metaText}>
+            {[item.camera_name, item.zone_name].filter(Boolean).join('  ·  ')}
+          </Text>
 
-        {!item.is_resolved && (
-          <TouchableOpacity
-            style={styles.resolveBtn}
-            onPress={() => onResolve(item.id)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.resolveBtnText}>✓ Đánh dấu đã xử lý</Text>
-          </TouchableOpacity>
-        )}
+          {/* Thanh độ chính xác */}
+          <View style={styles.confRow}>
+            <Text style={styles.confLabel}>{'Độ chính xác'}</Text>
+            <Text style={[styles.confValue, { color: severity.color }]}>
+              {`${confidencePct}%`}
+            </Text>
+          </View>
+          <View style={styles.confBarBg}>
+            <View style={[styles.confBarFill, {
+              width: `${confidencePct}%`,
+              backgroundColor: severity.color,
+            }]} />
+          </View>
+        </View>
       </View>
     </View>
   );
 };
 
-// ── Filter Tab ────────────────────────────────────────────
-const FilterTab = ({ label, active, count, onPress }) => (
-  <TouchableOpacity
-    style={[styles.filterTab, active && styles.filterTabActive]}
-    onPress={onPress}
-    activeOpacity={0.7}
-  >
-    <Text style={[styles.filterTabText, active && styles.filterTabTextActive]}>
-      {label}
-    </Text>
-    {count > 0 && (
-      <View style={[styles.filterBadge, active && styles.filterBadgeActive]}>
-        <Text
-          style={[
-            styles.filterBadgeText,
-            active && styles.filterBadgeTextActive,
-          ]}
-        >
-          {count}
-        </Text>
-      </View>
-    )}
-  </TouchableOpacity>
-);
-
 // ── Main Screen ───────────────────────────────────────────
 export default function AlertsScreen({ navigation }) {
   const { user } = useAuth();
-  const [alerts, setAlerts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState("all");
-  const [error, setError] = useState(null);
+  const [alerts, setAlerts]             = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [refreshing, setRefreshing]     = useState(false);
+  const [error, setError]               = useState(null);
   const [socketHostHint, setSocketHostHint] = useState("");
 
   const socketOptions = React.useMemo(() => {
     if (Platform.OS === "web") {
-      return {
-        transports: ["polling"],
-        upgrade: false,
-        timeout: 4000,
-        reconnection: false,
-        forceNew: false,
-      };
+      return { transports: ["polling"], upgrade: false, timeout: 4000, reconnection: false, forceNew: false };
     }
-
-    return {
-      transports: ["websocket"],
-      timeout: 4000,
-      reconnection: false,
-      forceNew: false,
-    };
+    return { transports: ["websocket"], timeout: 4000, reconnection: false, forceNew: false };
   }, []);
 
   const socketCandidates = React.useMemo(() => {
     if (socketHostHint) {
       try {
-        const parsed = new URL(socketHostHint);
-        return [parsed.origin];
-      } catch (error) {
+        return [new URL(socketHostHint).origin];
+      } catch {
         return [getSocketOriginFromHostname(socketHostHint)];
       }
     }
-
     return getSocketBaseCandidates();
   }, [socketHostHint]);
 
@@ -260,24 +187,17 @@ export default function AlertsScreen({ navigation }) {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       setError(null);
-      const res = await alertsAPI.getAll();
+      const res      = await alertsAPI.getAll();
       const incoming = res.data || [];
       setAlerts(incoming);
-
       const imageUrl = incoming.find((a) => !!a.image_url)?.image_url;
       if (imageUrl) {
         try {
           const hostname = new URL(imageUrl).hostname;
-          if (
-            hostname &&
-            hostname !== "localhost" &&
-            hostname !== "127.0.0.1"
-          ) {
+          if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
             setSocketHostHint((prev) => prev || hostname);
           }
-        } catch (parseError) {
-          // Ignore malformed image URLs.
-        }
+        } catch {}
       }
     } catch (err) {
       setError(err.message || "Không thể tải dữ liệu");
@@ -295,189 +215,88 @@ export default function AlertsScreen({ navigation }) {
 
   useEffect(() => {
     if (!user) return;
-
-    let mounted = true;
-    let activeSocket = null;
-    let connectTimer = null;
-    let connectResolver = null;
-    let retryTimer = null;
-    let cancelled = false;
+    let mounted = true, activeSocket = null, connectTimer = null,
+        connectResolver = null, retryTimer = null, cancelled = false;
 
     const connectSocket = async () => {
       for (const baseUrl of socketCandidates) {
         if (!mounted || cancelled) return;
-
         const socket = io(baseUrl, socketOptions);
-
         const connected = await new Promise((resolve) => {
           let done = false;
           connectResolver = resolve;
-
-          const finish = (ok) => {
-            if (done) return;
-            done = true;
-            resolve(ok);
-          };
-
+          const finish = (ok) => { if (done) return; done = true; resolve(ok); };
           connectTimer = setTimeout(() => finish(false), 3500);
-          socket.once("connect", () => finish(true));
+          socket.once("connect",       () => finish(true));
           socket.once("connect_error", () => finish(false));
         });
-
-        if (connectTimer) {
-          clearTimeout(connectTimer);
-          connectTimer = null;
-        }
+        if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
         connectResolver = null;
-
-        if (!connected || cancelled || !mounted) {
-          socket.removeAllListeners();
-          socket.disconnect();
-          continue;
-        }
-
+        if (!connected || cancelled || !mounted) { socket.removeAllListeners(); socket.disconnect(); continue; }
         activeSocket = socket;
         socket.on("new_alert", () => fetchAlerts(true));
         return;
       }
-
-      if (!cancelled && mounted) {
-        retryTimer = setTimeout(connectSocket, 10000);
-      }
+      if (!cancelled && mounted) retryTimer = setTimeout(connectSocket, 10000);
     };
 
     connectSocket();
-
     return () => {
-      mounted = false;
-      cancelled = true;
-      if (connectTimer) {
-        clearTimeout(connectTimer);
-        connectTimer = null;
-      }
-      if (connectResolver) {
-        connectResolver(false);
-        connectResolver = null;
-      }
-      if (retryTimer) {
-        clearTimeout(retryTimer);
-        retryTimer = null;
-      }
-      if (activeSocket) {
-        activeSocket.off("new_alert");
-        activeSocket.disconnect();
-      }
+      mounted = false; cancelled = true;
+      if (connectTimer)    { clearTimeout(connectTimer); connectTimer = null; }
+      if (connectResolver) { connectResolver(false); connectResolver = null; }
+      if (retryTimer)      { clearTimeout(retryTimer); retryTimer = null; }
+      if (activeSocket)    { activeSocket.off("new_alert"); activeSocket.disconnect(); }
     };
   }, [fetchAlerts, socketCandidates, socketOptions, user]);
 
-  const handleResolve = (id) => {
-    Alert.alert("Xác nhận", "Đánh dấu cảnh báo này là đã xử lý?", [
-      { text: "Huỷ", style: "cancel" },
-      {
-        text: "Xác nhận",
-        onPress: async () => {
-          try {
-            await alertsAPI.resolve(id);
-            setAlerts((prev) =>
-              prev.map((a) => (a.id === id ? { ...a, is_resolved: true } : a)),
-            );
-          } catch (err) {
-            Alert.alert("Lỗi", err.message);
-          }
-        },
-      },
-    ]);
-  };
-
-  const filtered = alerts.filter((a) =>
-    filter === "open"
-      ? !a.is_resolved
-      : filter === "resolved"
-        ? a.is_resolved
-        : true,
-  );
-  const openCount = alerts.filter((a) => !a.is_resolved).length;
-  const resolvedCount = alerts.filter((a) => a.is_resolved).length;
+  const totalCount = alerts.length;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={SURF} />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor={BG} />
 
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Alerts</Text>
-          <Text style={styles.headerSubtitle}>
-            {openCount > 0
-              ? `${openCount} cảnh báo chưa xử lý`
-              : "Không có cảnh báo mới"}
+          <Text style={styles.headerTitle}>{'NHẬT KÝ CẢNH BÁO'}</Text>
+          <Text style={styles.headerSub}>
+            {totalCount > 0 ? `${totalCount} sự kiện được ghi nhận` : 'Chưa có sự kiện nào'}
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.refreshBtn}
-          onPress={() => fetchAlerts(true)}
-        >
-          <Text style={styles.refreshBtnText}>↻</Text>
+        <TouchableOpacity style={styles.refreshBtn} onPress={() => fetchAlerts(true)}>
+          <Text style={styles.refreshBtnText}>{'↻'}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Filter tabs */}
-      <View style={styles.filterRow}>
-        <FilterTab
-          label="Tất cả"
-          active={filter === "all"}
-          count={alerts.length}
-          onPress={() => setFilter("all")}
-        />
-        <FilterTab
-          label="Chưa xử lý"
-          active={filter === "open"}
-          count={openCount}
-          onPress={() => setFilter("open")}
-        />
-        <FilterTab
-          label="Đã xử lý"
-          active={filter === "resolved"}
-          count={resolvedCount}
-          onPress={() => setFilter("resolved")}
-        />
-      </View>
+      {/* Divider accent */}
+      <View style={styles.headerAccentLine} />
 
       {/* Body */}
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={TEAL} />
-          <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
+          <Text style={styles.loadingText}>{'Đang tải...'}</Text>
         </View>
       ) : error ? (
         <View style={styles.centered}>
-          <Text style={styles.errorIcon}>⚠</Text>
-          <Text style={styles.errorTitle}>Không thể tải dữ liệu</Text>
+          <Text style={styles.errorTitle}>{'Không thể tải dữ liệu'}</Text>
           <Text style={styles.errorMsg}>{error}</Text>
-          <TouchableOpacity
-            style={styles.retryBtn}
-            onPress={() => fetchAlerts()}
-          >
-            <Text style={styles.retryText}>Thử lại</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => fetchAlerts()}>
+            <Text style={styles.retryText}>{'Thử lại'}</Text>
           </TouchableOpacity>
         </View>
-      ) : filtered.length === 0 ? (
+      ) : alerts.length === 0 ? (
         <View style={styles.centered}>
-          <Text style={styles.emptyIcon}>🔔</Text>
-          <Text style={styles.emptyTitle}>Không có cảnh báo</Text>
-          <Text style={styles.emptySubtitle}>
-            {filter === "open"
-              ? "Tất cả cảnh báo đã được xử lý"
-              : "Hệ thống đang hoạt động bình thường"}
-          </Text>
+          <View style={styles.emptyDot} />
+          <Text style={styles.emptyTitle}>{'Hệ thống an toàn'}</Text>
+          <Text style={styles.emptySubtitle}>{'Không có cảnh báo nào được ghi nhận'}</Text>
         </View>
       ) : (
         <FlatList
-          data={filtered}
+          data={alerts}
           keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) => (
-            <AlertItem item={item} onResolve={handleResolve} />
-          )}
+          renderItem={({ item }) => <AlertItem item={item} />}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -491,11 +310,7 @@ export default function AlertsScreen({ navigation }) {
         />
       )}
 
-      <BottomNav
-        navigation={navigation}
-        activeTab="Alerts"
-        requireAuth={requireAuth}
-      />
+      <BottomNav navigation={navigation} activeTab="Alerts" requireAuth={requireAuth} />
     </SafeAreaView>
   );
 }
@@ -503,154 +318,126 @@ export default function AlertsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
+  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: SURF,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    paddingTop: 16,
+    paddingBottom: 14,
+    backgroundColor: BG,
   },
-  headerTitle: { fontSize: 20, fontWeight: "800", color: TEXT1 },
-  headerSubtitle: { fontSize: 13, color: TEXT2, marginTop: 2 },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: TEXT1,
+    letterSpacing: 1.5,
+  },
+  headerSub: { fontSize: 12, color: TEXT2, marginTop: 3 },
+  headerAccentLine: {
+    height: 1,
+    backgroundColor: BORDER,
+    marginHorizontal: 20,
+    marginBottom: 4,
+  },
   refreshBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#F1F5F9",
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "#EEF2F7",  
+    borderWidth: 1,
+    borderColor: BORDER,
     justifyContent: "center",
     alignItems: "center",
   },
   refreshBtnText: { fontSize: 20, color: TEAL },
 
-  filterRow: {
+  // List
+  listContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 },
+
+  // Card
+  card: {
     flexDirection: "row",
     backgroundColor: SURF,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  filterTab: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    gap: 6,
-    backgroundColor: "#F1F5F9",
-  },
-  filterTabActive: { backgroundColor: TEAL },
-  filterTabText: { fontSize: 12, fontWeight: "600", color: TEXT2 },
-  filterTabTextActive: { color: "#FFFFFF" },
-  filterBadge: {
-    backgroundColor: "#E2E8F0",
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  filterBadgeActive: { backgroundColor: "rgba(255,255,255,0.25)" },
-  filterBadgeText: { fontSize: 11, fontWeight: "700", color: TEXT2 },
-  filterBadgeTextActive: { color: "#FFFFFF" },
-
-  listContent: { padding: 16, paddingBottom: 8 },
-
-  // Alert card
-  alertCard: {
-    backgroundColor: SURF,
-    borderRadius: 16,
+    borderRadius: 14,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: BORDER,
-    marginBottom: 14,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
     overflow: "hidden",
   },
-  alertCardResolved: { opacity: 0.6 },
+  cardAccentBar: { width: 4 },
+  cardInner: { flex: 1 },
 
   // Image
-  alertImage: {
-    width: "100%",
-    height: 190,
-    backgroundColor: "#E8ECF0",
+  imageWrapper: { position: "relative" },
+  alertImage: { width: "100%", height: 180, backgroundColor: "#0F1923" },
+  imageOverlay: {
+    position: "absolute",
+    bottom: 0, left: 0, right: 0,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "flex-end",
   },
-  alertImagePlaceholder: {
-    width: "100%",
-    height: 100,
-    backgroundColor: "#F1F5F9",
+  imageTap: { fontSize: 11, color: "rgba(255,255,255,0.6)" },
+  noImageBox: {
+    height: 72,
+    backgroundColor: "#F8FAFC",
     justifyContent: "center",
     alignItems: "center",
-    gap: 6,
   },
-  alertImagePlaceholderIcon: { fontSize: 28 },
-  alertImagePlaceholderText: { fontSize: 12, color: TEXT3 },
+  noImageText: { fontSize: 12, color: TEXT3 },
 
-  // Image overlay
-  imgOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    padding: 10,
-    backgroundColor: "rgba(0,0,0,0.25)",
-  },
-  imgSeverityBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  imgSeverityText: { fontSize: 11, fontWeight: "700" },
-  imgTapHint: { fontSize: 11, color: "rgba(255,255,255,0.8)" },
-
-  // Alert body
-  alertBody: { padding: 14 },
-  alertHeader: {
+  // Card body
+  cardBody: { padding: 14 },
+  cardTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  alertHeaderLeft: { flexDirection: "row", gap: 6 },
-  badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  badgeText: { fontSize: 11, fontWeight: "700" },
-  resolvedBadge: {
-    backgroundColor: "#E2E8F0",
-    borderRadius: 999,
+  severityPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  resolvedText: { fontSize: 11, fontWeight: "700", color: TEXT3 },
-  alertTime: { fontSize: 12, color: TEXT3 },
-  alertTitle: {
+  severityDot: { width: 6, height: 6, borderRadius: 3 },
+  severityLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
+  timeText: { fontSize: 11, color: TEXT3 },
+
+  objectTitle: {
     fontSize: 15,
     fontWeight: "700",
     color: TEXT1,
-    marginBottom: 4,
+    marginBottom: 5,
   },
-  alertMeta: { fontSize: 13, color: TEXT2, marginBottom: 2 },
-  alertConfidence: { fontSize: 12, color: TEXT3, marginBottom: 10 },
-  resolveBtn: {
-    backgroundColor: "#F0FDF4",
-    borderWidth: 1,
-    borderColor: "#86EFAC",
-    borderRadius: 10,
-    paddingVertical: 9,
-    alignItems: "center",
-  },
-  resolveBtnText: { fontSize: 13, fontWeight: "600", color: "#15803D" },
+  metaText: { fontSize: 12, color: TEXT2, marginBottom: 12 },
 
-  // Image viewer modal
+  // Confidence bar
+  confRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  confLabel: { fontSize: 11, color: TEXT3 },
+  confValue: { fontSize: 11, fontWeight: "700" },
+  confBarBg: {
+    height: 4,
+    backgroundColor: "#E2E8F0",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  confBarFill: { height: 4, borderRadius: 2 },
+
+  // Image viewer
   imgViewerOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.88)",
+    backgroundColor: "rgba(0,0,0,0.92)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -658,56 +445,33 @@ const styles = StyleSheet.create({
   imgViewerImg: { width: SCREEN_W, height: SCREEN_W * 0.75 },
   imgViewerClose: {
     position: "absolute",
-    top: -44,
-    right: 16,
-    width: 36,
-    height: 36,
+    top: -44, right: 16,
+    width: 36, height: 36,
     borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center",
     alignItems: "center",
   },
   imgViewerCloseText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
 
   // States
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 32,
-  },
-  loadingText: { marginTop: 12, fontSize: 14, color: TEXT2 },
-  errorIcon: { fontSize: 36, marginBottom: 12 },
-  errorTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: TEXT1,
-    marginBottom: 6,
-  },
-  errorMsg: {
-    fontSize: 13,
-    color: TEXT2,
-    textAlign: "center",
-    marginBottom: 16,
-  },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center", padding: 32 },
+  loadingText: { marginTop: 12, fontSize: 13, color: TEXT2 },
+  errorTitle: { fontSize: 15, fontWeight: "700", color: TEXT1, marginBottom: 6 },
+  errorMsg: { fontSize: 13, color: TEXT2, textAlign: "center", marginBottom: 16 },
   retryBtn: {
     backgroundColor: TEAL,
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 24,
     paddingVertical: 10,
   },
-  retryText: { color: "#FFF", fontWeight: "700", fontSize: 14 },
-  emptyIcon: { fontSize: 40, marginBottom: 16 },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: TEXT1,
-    marginBottom: 8,
+  retryText: { color: "#FFF", fontWeight: "700", fontSize: 13 },
+  emptyDot: {
+    width: 12, height: 12,
+    borderRadius: 6,
+    backgroundColor: "#22C55E",
+    marginBottom: 16,
   },
-  emptySubtitle: {
-    fontSize: 14,
-    color: TEXT2,
-    textAlign: "center",
-    lineHeight: 22,
-  },
+  emptyTitle: { fontSize: 16, fontWeight: "700", color: TEXT1, marginBottom: 6 },
+  emptySubtitle: { fontSize: 13, color: TEXT2, textAlign: "center" },
 });

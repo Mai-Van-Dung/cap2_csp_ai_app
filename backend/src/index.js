@@ -2,7 +2,9 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");   
 const authRoutes = require("./routes/authRoutes");
+const alertsRoutes = require('./routes/alertsRoutes');
 const bodyParser = require("body-parser");
+const telegramRoutes = require('./routes/telegramRoutes');
 require("dotenv").config();
 const pool = require("./config/database");
 const app = express();
@@ -20,9 +22,8 @@ app.get("/", (req, res) => {
   res.json({ message: "CAPS AI App Backend API" });
 });
 app.use("/api/auth", authRoutes);
-
-const alertsRoutes = require('./routes/alertsRoutes');
 app.use('/api/alerts', alertsRoutes);
+app.use('/api/telegram', telegramRoutes);
 app.use('/static', express.static(path.join(__dirname, '../static')));
 
 app.listen(PORT, async () => {

@@ -1,4 +1,5 @@
 const db = require("../database/db");
+const { notifyAlert } = require("./telegramController");
 
 const normalizeBaseUrl = (value) => value.replace(/\/+$/, "");
 
@@ -90,4 +91,31 @@ const resolveAlert = async (req, res) => {
   }
 };
 
-module.exports = { getAlerts, resolveAlert };
+// POST /api/alerts/notify — THÊM MỚI
+// Python/Flask gọi route này khi phát hiện xâm nhập
+const receiveAlert = async (req, res) => {
+  try {
+    const {
+      object_type,
+      camera_name,
+      confidence,
+      image_path,
+      secret,          // khoá bí mật để xác thực từ Python
+    } = req.body;
+
+    // Xác thực secret key — Python phải gửi đúng key này
+    if (secret !== process.env.INTERNAL_SECRET) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Gửi Telegram ngay lập tức (không cần await để không block)
+    notifyAlert(object_type, camera_name, confidence, image_path);
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("receiveAlert error:", error);
+    res.status(500).json({ message: "Lỗi server" });
+  }
+};
+
+module.exports = { getAlerts, resolveAlert, receiveAlert };
