@@ -1,8 +1,34 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getApiBaseCandidates } from "../config/endpoints";
-
+import {
+  getApiBaseCandidates,
+  refreshConnectionInfo,
+} from "../config/endpoints";
 
 let preferredBaseUrl = null;
+let unauthorizedHandler = null;
+
+export const setUnauthorizedHandler = (handler) => {
+  unauthorizedHandler = typeof handler === "function" ? handler : null;
+};
+
+const INVALID_TOKEN_VALUES = new Set(["", "null", "undefined", "false"]);
+
+const normalizeToken = (value) => {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (INVALID_TOKEN_VALUES.has(trimmed.toLowerCase())) return "";
+  return trimmed;
+};
+
+const getStoredToken = async () => {
+  const keys = ["token", "authToken", "accessToken"];
+  for (const key of keys) {
+    const raw = await AsyncStorage.getItem(key);
+    const token = normalizeToken(raw);
+    if (token) return token;
+  }
+  return "";
+};
 
 const fetchWithTimeout = async (url, options, timeoutMs = 8000) => {
   const controller = new AbortController();
@@ -17,11 +43,21 @@ const fetchWithTimeout = async (url, options, timeoutMs = 8000) => {
 
 // ── Helper gọi API ────────────────────────────────────────
 const request = async (endpoint, method = "GET", body = null, auth = false) => {
+  const connectionInfo = await refreshConnectionInfo();
+
+  preferredBaseUrl =
+    connectionInfo?.preferredBaseUrl ||
+    connectionInfo?.preferred_base_url ||
+    preferredBaseUrl;
+
   const headers = { "Content-Type": "application/json" };
 
   if (auth) {
-    const token = await AsyncStorage.getItem("token");
-    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const token = await getStoredToken();
+    if (!token) {
+      throw new Error("Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn.");
+    }
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
   const options = { method, headers };
@@ -56,6 +92,18 @@ const request = async (endpoint, method = "GET", body = null, auth = false) => {
       data = await response.json();
     } catch (error) {
       data = null;
+    }
+
+    if (auth && response.status === 401) {
+      await AsyncStorage.multiRemove(["token", "user"]);
+      if (unauthorizedHandler) {
+        try {
+          unauthorizedHandler();
+        } catch (error) {
+          // Keep request flow intact even if UI logout callback fails.
+        }
+      }
+      throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
     }
 
     if (!response.ok) {
@@ -100,9 +148,9 @@ export const alertsAPI = {
 export const telegramAPI = {
   // Lưu Chat ID lên backend
   saveChatId: (chatId) =>
-    request('/telegram/chat-id', 'POST', { chat_id: chatId }, true),
+    request("/telegram/chat-id", "POST", { chat_id: chatId }, true),
 
   // Gửi tin nhắn test
   sendTest: (chatId) =>
-    request('/telegram/test', 'POST', { chat_id: chatId }, true),
+    request("/telegram/test", "POST", { chat_id: chatId }, true),
 };

@@ -8,51 +8,78 @@ import {
   getAlertImageCandidates,
   getSocketOriginFromHostname,
   getSocketBaseCandidates,
+  getSocketPath,
+  refreshConnectionInfo,
 } from "../config/endpoints";
 import BottomNav from "../components/BottomNav";
 import {
-  View, Text, StyleSheet, StatusBar, FlatList, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Alert, Image, Modal,
-  Dimensions, Platform,
+  View,
+  Text,
+  StyleSheet,
+  StatusBar,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
+  Image,
+  Modal,
+  Dimensions,
+  Platform,
 } from "react-native";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
-const TEAL    = "#2E7D8C";
-const BG      = "#F0F4F8";       // nền tổng thể xám xanh nhạt
-const SURF    = "#FFFFFF";       // card trắng
-const SURF2   = "#F1F5F9";       // nền phụ
-const TEXT1   = "#0F172A";       // chữ đậm
-const TEXT2   = "#475569";       // chữ phụ
-const TEXT3   = "#94A3B8";       // chữ mờ
-const BORDER  = "#E2E8F0";       // viền
-const ACCENT  = "#EF4444";
+const TEAL = "#2E7D8C";
+const BG = "#F0F4F8"; // nền tổng thể xám xanh nhạt
+const SURF = "#FFFFFF"; // card trắng
+const SURF2 = "#F1F5F9"; // nền phụ
+const TEXT1 = "#0F172A"; // chữ đậm
+const TEXT2 = "#475569"; // chữ phụ
+const TEXT3 = "#94A3B8"; // chữ mờ
+const BORDER = "#E2E8F0"; // viền
+const ACCENT = "#EF4444";
 
 // ── Helpers ───────────────────────────────────────────────
 const getSeverity = (confidence) => {
-  if (confidence >= 0.8) return { label: "NGUY HIỂM CAO", color: "#EF4444", bar: "#EF4444" };
-  if (confidence >= 0.5) return { label: "TRUNG BÌNH",    color: "#F59E0B", bar: "#F59E0B" };
-  return                        { label: "THẤP",           color: "#22C55E", bar: "#22C55E" };
+  if (confidence >= 0.8)
+    return { label: "NGUY HIỂM CAO", color: "#EF4444", bar: "#EF4444" };
+  if (confidence >= 0.5)
+    return { label: "TRUNG BÌNH", color: "#F59E0B", bar: "#F59E0B" };
+  return { label: "THẤP", color: "#22C55E", bar: "#22C55E" };
 };
 
 const formatTime = (isoString) => {
   const date = new Date(isoString);
-  const now  = new Date();
+  const now = new Date();
   const diff = Math.floor((now - date) / 1000);
-  if (diff < 60)    return `${diff} giây trước`;
-  if (diff < 3600)  return `${Math.floor(diff / 60)} phút trước`;
+  if (diff < 60) return `${diff} giây trước`;
+  if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
   return date.toLocaleDateString("vi-VN");
 };
 
 // ── Image Viewer ──────────────────────────────────────────
 const ImageViewer = ({ uri, visible, onClose }) => (
-  <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-    <TouchableOpacity style={styles.imgViewerOverlay} activeOpacity={1} onPress={onClose}>
+  <Modal
+    visible={visible}
+    transparent
+    animationType="fade"
+    onRequestClose={onClose}
+  >
+    <TouchableOpacity
+      style={styles.imgViewerOverlay}
+      activeOpacity={1}
+      onPress={onClose}
+    >
       <View style={styles.imgViewerBox}>
-        <Image source={{ uri }} style={styles.imgViewerImg} resizeMode="contain" />
+        <Image
+          source={{ uri }}
+          style={styles.imgViewerImg}
+          resizeMode="contain"
+        />
         <TouchableOpacity style={styles.imgViewerClose} onPress={onClose}>
-          <Text style={styles.imgViewerCloseText}>{'✕'}</Text>
+          <Text style={styles.imgViewerCloseText}>{"✕"}</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -61,10 +88,13 @@ const ImageViewer = ({ uri, visible, onClose }) => (
 
 // ── Alert Card ────────────────────────────────────────────
 const AlertItem = ({ item }) => {
-  const severity       = getSeverity(item.confidence);
-  const imageCandidates = React.useMemo(() => getAlertImageCandidates(item), [item]);
+  const severity = getSeverity(item.confidence);
+  const imageCandidates = React.useMemo(
+    () => getAlertImageCandidates(item),
+    [item],
+  );
   const [imageIndex, setImageIndex] = useState(0);
-  const [viewing, setViewing]       = useState(false);
+  const [viewing, setViewing] = useState(false);
   const displayImageUri = imageCandidates[imageIndex] || null;
 
   useEffect(() => {
@@ -72,7 +102,9 @@ const AlertItem = ({ item }) => {
   }, [item.id, item.image_url, item.image_urls, item.image_path]);
 
   const handleImageError = useCallback(() => {
-    setImageIndex((prev) => (prev >= imageCandidates.length - 1 ? prev : prev + 1));
+    setImageIndex((prev) =>
+      prev >= imageCandidates.length - 1 ? prev : prev + 1,
+    );
   }, [imageCandidates.length]);
 
   const confidencePct = Math.round((item.confidence || 0) * 100);
@@ -80,12 +112,17 @@ const AlertItem = ({ item }) => {
   return (
     <View style={styles.card}>
       {/* Thanh màu severity bên trái */}
-      <View style={[styles.cardAccentBar, { backgroundColor: severity.color }]} />
+      <View
+        style={[styles.cardAccentBar, { backgroundColor: severity.color }]}
+      />
 
       <View style={styles.cardInner}>
         {/* Ảnh */}
         {displayImageUri ? (
-          <TouchableOpacity activeOpacity={0.9} onPress={() => setViewing(true)}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => setViewing(true)}
+          >
             <View style={styles.imageWrapper}>
               <Image
                 source={{ uri: displayImageUri }}
@@ -94,26 +131,37 @@ const AlertItem = ({ item }) => {
                 onError={handleImageError}
               />
               <View style={styles.imageOverlay}>
-                <Text style={styles.imageTap}>{'Nhấn để phóng to'}</Text>
+                <Text style={styles.imageTap}>{"Nhấn để phóng to"}</Text>
               </View>
             </View>
           </TouchableOpacity>
         ) : (
           <View style={styles.noImageBox}>
-            <Text style={styles.noImageText}>{'Không có hình ảnh'}</Text>
+            <Text style={styles.noImageText}>{"Không có hình ảnh"}</Text>
           </View>
         )}
 
         {displayImageUri && (
-          <ImageViewer uri={displayImageUri} visible={viewing} onClose={() => setViewing(false)} />
+          <ImageViewer
+            uri={displayImageUri}
+            visible={viewing}
+            onClose={() => setViewing(false)}
+          />
         )}
 
         {/* Thông tin */}
         <View style={styles.cardBody}>
           {/* Hàng trên: severity label + thời gian */}
           <View style={styles.cardTopRow}>
-            <View style={[styles.severityPill, { borderColor: severity.color }]}>
-              <View style={[styles.severityDot, { backgroundColor: severity.color }]} />
+            <View
+              style={[styles.severityPill, { borderColor: severity.color }]}
+            >
+              <View
+                style={[
+                  styles.severityDot,
+                  { backgroundColor: severity.color },
+                ]}
+              />
               <Text style={[styles.severityLabel, { color: severity.color }]}>
                 {severity.label}
               </Text>
@@ -123,26 +171,31 @@ const AlertItem = ({ item }) => {
 
           {/* Tên đối tượng */}
           <Text style={styles.objectTitle}>
-            {item.object_type || 'Đối tượng không xác định'}
+            {item.object_type || "Đối tượng không xác định"}
           </Text>
 
           {/* Camera + zone */}
           <Text style={styles.metaText}>
-            {[item.camera_name, item.zone_name].filter(Boolean).join('  ·  ')}
+            {[item.camera_name, item.zone_name].filter(Boolean).join("  ·  ")}
           </Text>
 
           {/* Thanh độ chính xác */}
           <View style={styles.confRow}>
-            <Text style={styles.confLabel}>{'Độ chính xác'}</Text>
+            <Text style={styles.confLabel}>{"Độ chính xác"}</Text>
             <Text style={[styles.confValue, { color: severity.color }]}>
               {`${confidencePct}%`}
             </Text>
           </View>
           <View style={styles.confBarBg}>
-            <View style={[styles.confBarFill, {
-              width: `${confidencePct}%`,
-              backgroundColor: severity.color,
-            }]} />
+            <View
+              style={[
+                styles.confBarFill,
+                {
+                  width: `${confidencePct}%`,
+                  backgroundColor: severity.color,
+                },
+              ]}
+            />
           </View>
         </View>
       </View>
@@ -153,17 +206,32 @@ const AlertItem = ({ item }) => {
 // ── Main Screen ───────────────────────────────────────────
 export default function AlertsScreen({ navigation }) {
   const { user } = useAuth();
-  const [alerts, setAlerts]             = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [refreshing, setRefreshing]     = useState(false);
-  const [error, setError]               = useState(null);
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
   const [socketHostHint, setSocketHostHint] = useState("");
+  const [discoveryVersion, setDiscoveryVersion] = useState(0);
 
   const socketOptions = React.useMemo(() => {
+    const socketPath = getSocketPath();
     if (Platform.OS === "web") {
-      return { transports: ["polling"], upgrade: false, timeout: 4000, reconnection: false, forceNew: false };
+      return {
+        transports: ["polling"],
+        upgrade: false,
+        timeout: 4000,
+        reconnection: false,
+        forceNew: false,
+        path: socketPath,
+      };
     }
-    return { transports: ["websocket"], timeout: 4000, reconnection: false, forceNew: false };
+    return {
+      transports: ["websocket"],
+      timeout: 4000,
+      reconnection: false,
+      forceNew: false,
+      path: socketPath,
+    };
   }, []);
 
   const socketCandidates = React.useMemo(() => {
@@ -175,7 +243,19 @@ export default function AlertsScreen({ navigation }) {
       }
     }
     return getSocketBaseCandidates();
-  }, [socketHostHint]);
+  }, [socketHostHint, discoveryVersion]);
+
+  useEffect(() => {
+    let mounted = true;
+    refreshConnectionInfo({ force: true }).finally(() => {
+      if (mounted) {
+        setDiscoveryVersion((value) => value + 1);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const requireAuth = (action) => {
     if (!user) navigation.navigate("Login");
@@ -187,14 +267,18 @@ export default function AlertsScreen({ navigation }) {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       setError(null);
-      const res      = await alertsAPI.getAll();
+      const res = await alertsAPI.getAll();
       const incoming = res.data || [];
       setAlerts(incoming);
       const imageUrl = incoming.find((a) => !!a.image_url)?.image_url;
       if (imageUrl) {
         try {
           const hostname = new URL(imageUrl).hostname;
-          if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
+          if (
+            hostname &&
+            hostname !== "localhost" &&
+            hostname !== "127.0.0.1"
+          ) {
             setSocketHostHint((prev) => prev || hostname);
           }
         } catch {}
@@ -215,8 +299,12 @@ export default function AlertsScreen({ navigation }) {
 
   useEffect(() => {
     if (!user) return;
-    let mounted = true, activeSocket = null, connectTimer = null,
-        connectResolver = null, retryTimer = null, cancelled = false;
+    let mounted = true,
+      activeSocket = null,
+      connectTimer = null,
+      connectResolver = null,
+      retryTimer = null,
+      cancelled = false;
 
     const connectSocket = async () => {
       for (const baseUrl of socketCandidates) {
@@ -225,14 +313,25 @@ export default function AlertsScreen({ navigation }) {
         const connected = await new Promise((resolve) => {
           let done = false;
           connectResolver = resolve;
-          const finish = (ok) => { if (done) return; done = true; resolve(ok); };
+          const finish = (ok) => {
+            if (done) return;
+            done = true;
+            resolve(ok);
+          };
           connectTimer = setTimeout(() => finish(false), 3500);
-          socket.once("connect",       () => finish(true));
+          socket.once("connect", () => finish(true));
           socket.once("connect_error", () => finish(false));
         });
-        if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
+        if (connectTimer) {
+          clearTimeout(connectTimer);
+          connectTimer = null;
+        }
         connectResolver = null;
-        if (!connected || cancelled || !mounted) { socket.removeAllListeners(); socket.disconnect(); continue; }
+        if (!connected || cancelled || !mounted) {
+          socket.removeAllListeners();
+          socket.disconnect();
+          continue;
+        }
         activeSocket = socket;
         socket.on("new_alert", () => fetchAlerts(true));
         return;
@@ -242,30 +341,48 @@ export default function AlertsScreen({ navigation }) {
 
     connectSocket();
     return () => {
-      mounted = false; cancelled = true;
-      if (connectTimer)    { clearTimeout(connectTimer); connectTimer = null; }
-      if (connectResolver) { connectResolver(false); connectResolver = null; }
-      if (retryTimer)      { clearTimeout(retryTimer); retryTimer = null; }
-      if (activeSocket)    { activeSocket.off("new_alert"); activeSocket.disconnect(); }
+      mounted = false;
+      cancelled = true;
+      if (connectTimer) {
+        clearTimeout(connectTimer);
+        connectTimer = null;
+      }
+      if (connectResolver) {
+        connectResolver(false);
+        connectResolver = null;
+      }
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+      if (activeSocket) {
+        activeSocket.off("new_alert");
+        activeSocket.disconnect();
+      }
     };
   }, [fetchAlerts, socketCandidates, socketOptions, user]);
 
   const totalCount = alerts.length;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="light-content" backgroundColor={BG} />
 
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>{'NHẬT KÝ CẢNH BÁO'}</Text>
+          <Text style={styles.headerTitle}>{"NHẬT KÝ CẢNH BÁO"}</Text>
           <Text style={styles.headerSub}>
-            {totalCount > 0 ? `${totalCount} sự kiện được ghi nhận` : 'Chưa có sự kiện nào'}
+            {totalCount > 0
+              ? `${totalCount} sự kiện được ghi nhận`
+              : "Chưa có sự kiện nào"}
           </Text>
         </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={() => fetchAlerts(true)}>
-          <Text style={styles.refreshBtnText}>{'↻'}</Text>
+        <TouchableOpacity
+          style={styles.refreshBtn}
+          onPress={() => fetchAlerts(true)}
+        >
+          <Text style={styles.refreshBtnText}>{"↻"}</Text>
         </TouchableOpacity>
       </View>
 
@@ -276,21 +393,26 @@ export default function AlertsScreen({ navigation }) {
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={TEAL} />
-          <Text style={styles.loadingText}>{'Đang tải...'}</Text>
+          <Text style={styles.loadingText}>{"Đang tải..."}</Text>
         </View>
       ) : error ? (
         <View style={styles.centered}>
-          <Text style={styles.errorTitle}>{'Không thể tải dữ liệu'}</Text>
+          <Text style={styles.errorTitle}>{"Không thể tải dữ liệu"}</Text>
           <Text style={styles.errorMsg}>{error}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => fetchAlerts()}>
-            <Text style={styles.retryText}>{'Thử lại'}</Text>
+          <TouchableOpacity
+            style={styles.retryBtn}
+            onPress={() => fetchAlerts()}
+          >
+            <Text style={styles.retryText}>{"Thử lại"}</Text>
           </TouchableOpacity>
         </View>
       ) : alerts.length === 0 ? (
         <View style={styles.centered}>
           <View style={styles.emptyDot} />
-          <Text style={styles.emptyTitle}>{'Hệ thống an toàn'}</Text>
-          <Text style={styles.emptySubtitle}>{'Không có cảnh báo nào được ghi nhận'}</Text>
+          <Text style={styles.emptyTitle}>{"Hệ thống an toàn"}</Text>
+          <Text style={styles.emptySubtitle}>
+            {"Không có cảnh báo nào được ghi nhận"}
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -310,7 +432,11 @@ export default function AlertsScreen({ navigation }) {
         />
       )}
 
-      <BottomNav navigation={navigation} activeTab="Alerts" requireAuth={requireAuth} />
+      <BottomNav
+        navigation={navigation}
+        activeTab="Alerts"
+        requireAuth={requireAuth}
+      />
     </SafeAreaView>
   );
 }
@@ -345,7 +471,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: "#EEF2F7",  
+    backgroundColor: "#EEF2F7",
     borderWidth: 1,
     borderColor: BORDER,
     justifyContent: "center",
@@ -374,7 +500,9 @@ const styles = StyleSheet.create({
   alertImage: { width: "100%", height: 180, backgroundColor: "#0F1923" },
   imageOverlay: {
     position: "absolute",
-    bottom: 0, left: 0, right: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingVertical: 8,
     paddingHorizontal: 12,
     backgroundColor: "rgba(0,0,0,0.45)",
@@ -445,8 +573,10 @@ const styles = StyleSheet.create({
   imgViewerImg: { width: SCREEN_W, height: SCREEN_W * 0.75 },
   imgViewerClose: {
     position: "absolute",
-    top: -44, right: 16,
-    width: 36, height: 36,
+    top: -44,
+    right: 16,
+    width: 36,
+    height: 36,
     borderRadius: 18,
     backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center",
@@ -455,10 +585,25 @@ const styles = StyleSheet.create({
   imgViewerCloseText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
 
   // States
-  centered: { flex: 1, justifyContent: "center", alignItems: "center", padding: 32 },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
   loadingText: { marginTop: 12, fontSize: 13, color: TEXT2 },
-  errorTitle: { fontSize: 15, fontWeight: "700", color: TEXT1, marginBottom: 6 },
-  errorMsg: { fontSize: 13, color: TEXT2, textAlign: "center", marginBottom: 16 },
+  errorTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: TEXT1,
+    marginBottom: 6,
+  },
+  errorMsg: {
+    fontSize: 13,
+    color: TEXT2,
+    textAlign: "center",
+    marginBottom: 16,
+  },
   retryBtn: {
     backgroundColor: TEAL,
     borderRadius: 10,
@@ -467,11 +612,17 @@ const styles = StyleSheet.create({
   },
   retryText: { color: "#FFF", fontWeight: "700", fontSize: 13 },
   emptyDot: {
-    width: 12, height: 12,
+    width: 12,
+    height: 12,
     borderRadius: 6,
     backgroundColor: "#22C55E",
     marginBottom: 16,
   },
-  emptyTitle: { fontSize: 16, fontWeight: "700", color: TEXT1, marginBottom: 6 },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: TEXT1,
+    marginBottom: 6,
+  },
   emptySubtitle: { fontSize: 13, color: TEXT2, textAlign: "center" },
 });

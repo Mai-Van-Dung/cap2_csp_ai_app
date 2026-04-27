@@ -16,13 +16,25 @@ User app phải hiển thị được:
 - Luôn dùng IP LAN hoặc domain thật của máy chạy backend.
 - Nếu WebView chạy được nhưng ảnh cảnh báo không hiện, ưu tiên kiểm tra URL ảnh và biến môi trường trước.
 - Nếu backend trả về nhiều URL trong `image_urls`, UI phải thử lần lượt từng URL rồi mới fallback.
+- Khong hard-code mot IP Python cu; uu tien discovery qua `/api/connection-info`.
 
 ## Backend endpoints
 
 - `GET /viewer/camera?label=...`
 - `GET /video_feed`
+- `GET /api/connection-info` (Python)
+- `GET /status` (camera backend Flask)
 - `GET /api/alerts`
 - `PATCH /api/alerts/:id/resolve`
+- `POST /api/alerts/notify` (bridge alert qua Node backend)
+
+## Realtime event contract
+
+- Socket.IO event: `new_alert`
+- Preferred socket host: base URL da duoc chon tu `base_candidates`
+- Fallback socket host: backend API origin (Node backend) neu camera socket khong ket noi duoc
+
+Node backend đã hỗ trợ Socket.IO bridge: khi `POST /api/alerts/notify` được gọi thành công sẽ phát `new_alert` cho app.
 
 ## Biến môi trường đề xuất
 
@@ -31,6 +43,7 @@ EXPO_PUBLIC_BACKEND_BASE_URL=http://192.168.1.8:5003
 EXPO_PUBLIC_CAMERA_BASE_URL=http://192.168.1.8:5000
 EXPO_PUBLIC_VIDEO_FEED_URL=http://192.168.1.8:5000/video_feed
 EXPO_PUBLIC_ALERTS_API_URL=http://192.168.1.8:5003/api/alerts
+EXPO_PUBLIC_DISCOVERY_SEED_HOST=192.168.1.8
 ```
 
 Nếu app web đang dùng Vite, các giá trị `VITE_*` tương ứng cũng được hỗ trợ.
@@ -89,6 +102,10 @@ const primaryUrl = urls[0] || alert.image_url || fallbackImage;
 - Nếu cần refresh lịch sử cảnh báo, gọi lại `GET /api/alerts`.
 - Nếu app chạy trên Android, kiểm tra cleartext HTTP nếu backend chưa có HTTPS.
 - Nếu điện thoại cùng Wi-Fi với backend, xác nhận mở được `http://<LAN_IP>:5000/viewer/camera` trên trình duyệt trước.
+- Discovery flow khuyen nghi: seed URL -> `GET /api/connection-info` -> probe `base_candidates` -> chon base dau tien reachable.
+- Kiểm tra handshake socket:
+  - `http://<LAN_IP>:5000/socket.io/?EIO=4&transport=polling` (Flask)
+  - `http://<LAN_IP>:5003/socket.io/?EIO=4&transport=polling` (Node bridge)
 
 ## Gợi ý kiểm tra nhanh
 

@@ -1,7 +1,17 @@
 const db = require("../database/db");
 const { notifyAlert } = require("./telegramController");
+const { broadcastNewAlert } = require("../realtime/socket");
 
 const normalizeBaseUrl = (value) => value.replace(/\/+$/, "");
+
+const getAlertImagePublicBaseUrl = () => {
+  return normalizeBaseUrl(
+    process.env.ALERT_IMAGE_PUBLIC_BASE_URL ||
+      process.env.PUBLIC_BASE_URL ||
+      process.env.BASE_URL ||
+      "",
+  );
+};
 
 const getPublicBaseUrl = (req) => {
   const configured = process.env.PUBLIC_BASE_URL || process.env.BASE_URL;
@@ -15,12 +25,23 @@ const getPublicBaseUrl = (req) => {
 
 const buildImageUrls = (baseUrl, imagePath) => {
   const normalizedPath = imagePath.replace(/\\/g, "/").replace(/^\/+/, "");
-  const candidates = [
-    `${baseUrl}/static/${normalizedPath}`,
-    `${baseUrl}/${normalizedPath}`,
-  ];
+  const isAlreadyStatic = normalizedPath.startsWith("static/");
+  const candidates = isAlreadyStatic
+    ? [
+        `${baseUrl}/${normalizedPath}`,
+        `${baseUrl}/${normalizedPath.replace(/^static\//, "")}`,
+      ]
+    : [`${baseUrl}/static/${normalizedPath}`, `${baseUrl}/${normalizedPath}`];
 
   return [...new Set(candidates)];
+};
+
+const isConfiguredSecret = (value) => {
+  const normalized = String(value || "").trim();
+  if (!normalized) return false;
+  if (normalized === "your_internal_secret") return false;
+  if (normalized === "change_me_internal_secret") return false;
+  return true;
 };
 
 // GET /api/alerts
@@ -48,7 +69,7 @@ const getAlerts = async (req, res) => {
       [userId],
     );
 
-    const baseUrl = getPublicBaseUrl(req);
+    const baseUrl = getAlertImagePublicBaseUrl() || getPublicBaseUrl(req);
     const data = rows.map((row) => ({
       ...row,
       image_urls: row.image_path ? buildImageUrls(baseUrl, row.image_path) : [],
@@ -98,20 +119,68 @@ const receiveAlert = async (req, res) => {
     const {
       object_type,
       camera_name,
+      zone_id,
       confidence,
       image_path,
-      secret,          // khoá bí mật để xác thực từ Python
+      image_url,
+      image_urls,
+      image_base64,
+      image_filename,
+      message,
+      source,
+      secret, // khoá bí mật để xác thực từ Python
     } = req.body;
 
     // Xác thực secret key — Python phải gửi đúng key này
-    if (secret !== process.env.INTERNAL_SECRET) {
+    const configuredSecret = process.env.INTERNAL_SECRET;
+    if (isConfiguredSecret(configuredSecret) && secret !== configuredSecret) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // Gửi Telegram ngay lập tức (không cần await để không block)
-    notifyAlert(object_type, camera_name, confidence, image_path);
+    const imagePublicBaseUrl =
+      getAlertImagePublicBaseUrl() || getPublicBaseUrl(req);
+    const normalizedImageUrls = [
+      ...(Array.isArray(image_urls) ? image_urls : []),
+      image_url,
+    ].filter(Boolean);
 
-    res.json({ ok: true });
+    const fallbackImageUrls = image_path
+      ? buildImageUrls(imagePublicBaseUrl, image_path)
+      : [];
+
+    const relayImageUrls = [
+      ...new Set([...normalizedImageUrls, ...fallbackImageUrls]),
+    ];
+    const relayImageUrl = relayImageUrls[0] || null;
+
+    const socketPayload = {
+      object_type: object_type || "unknown",
+      camera_name: camera_name || "Camera",
+      zone_id: zone_id || null,
+      confidence: confidence ?? null,
+      image_path: image_path || null,
+      image_url: relayImageUrl,
+      image_urls: relayImageUrls,
+      message: message || null,
+      created_at: new Date().toISOString(),
+      source: source || "python-backend",
+    };
+
+    const socketEmitted = broadcastNewAlert(socketPayload);
+
+    // Send Telegram and return delivery stats for easier integration debugging.
+    const telegram = await notifyAlert({
+      objectType: object_type,
+      cameraName: camera_name,
+      confidence,
+      imagePath: image_path,
+      imageUrl: relayImageUrl,
+      imageUrls: relayImageUrls,
+      imageBase64: image_base64,
+      imageFilename: image_filename,
+    });
+
+    res.json({ ok: true, telegram, socket_emitted: socketEmitted });
   } catch (error) {
     console.error("receiveAlert error:", error);
     res.status(500).json({ message: "Lỗi server" });
