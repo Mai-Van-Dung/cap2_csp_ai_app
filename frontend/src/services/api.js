@@ -133,6 +133,17 @@ export const authAPI = {
     request("/auth/register", "POST", { username, email, password, full_name }),
 
   getMe: () => request("/auth/me", "GET", null, true),
+
+  changePassword: (currentPassword, newPassword) =>
+    request(
+      "/auth/change-password",
+      "POST",
+      {
+        current_password: currentPassword,
+        new_password: newPassword,
+      },
+      true,
+    ),
 };
 
 // ── Alerts APIs ───────────────────────────────────────────
@@ -153,4 +164,13 @@ export const telegramAPI = {
   // Gửi tin nhắn test
   sendTest: (chatId) =>
     request("/telegram/test", "POST", { chat_id: chatId }, true),
+};
+
+// ── Camera mode APIs ─────────────────────────────────────
+export const cameraModeAPI = {
+  toggleSupervised: (cameraId, enabled) =>
+    request("/api/camera/toggle-supervised", "POST", {
+      camera_id: cameraId,
+      enabled,
+    }),
 };

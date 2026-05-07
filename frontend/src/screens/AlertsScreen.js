@@ -417,7 +417,9 @@ export default function AlertsScreen({ navigation }) {
       ) : (
         <FlatList
           data={alerts}
-          keyExtractor={(item) => String(item.id)}
+          keyExtractor={(item, index) =>
+            `${item?.id ?? "na"}-${item?.created_at ?? "na"}-${index}`
+          }
           renderItem={({ item }) => <AlertItem item={item} />}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}

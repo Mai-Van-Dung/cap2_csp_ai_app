@@ -1,6 +1,6 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const db = require('../config/database');
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const db = require("../config/database");
 
 // ============================================================
 // ĐĂNG KÍ
@@ -9,39 +9,43 @@ exports.register = async (req, res) => {
   const { username, email, password, full_name } = req.body;
 
   if (!username || !email || !password) {
-    return res.status(400).json({ message: 'Vui lòng nhập đầy đủ thông tin.' });
+    return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin." });
   }
 
   try {
     // Kiểm tra username / email đã tồn tại chưa
     const [existing] = await db.query(
-      'SELECT id FROM users WHERE username = ? OR email = ?',
-      [username, email]
+      "SELECT id FROM users WHERE username = ? OR email = ?",
+      [username, email],
     );
     if (existing.length > 0) {
-      return res.status(409).json({ message: 'Username hoặc email đã được sử dụng.' });
+      return res
+        .status(409)
+        .json({ message: "Username hoặc email đã được sử dụng." });
     }
 
     // Hash mật khẩu
     const password_hash = await bcrypt.hash(password, 10);
 
     // Lấy role mặc định (viewer = id 2, tuỳ data seeding của bạn)
-    const [roles] = await db.query("SELECT id FROM roles WHERE role_name = 'viewer' LIMIT 1");
+    const [roles] = await db.query(
+      "SELECT id FROM roles WHERE role_name = 'viewer' LIMIT 1",
+    );
     const role_id = roles.length > 0 ? roles[0].id : null;
 
     // Insert user mới
     const [result] = await db.query(
-      'INSERT INTO users (role_id, username, password_hash, email, full_name) VALUES (?, ?, ?, ?, ?)',
-      [role_id, username, password_hash, email, full_name || null]
+      "INSERT INTO users (role_id, username, password_hash, email, full_name) VALUES (?, ?, ?, ?, ?)",
+      [role_id, username, password_hash, email, full_name || null],
     );
 
     return res.status(201).json({
-      message: 'Đăng ký thành công!',
+      message: "Đăng ký thành công!",
       userId: result.insertId,
     });
   } catch (err) {
-    console.error('[register]', err);
-    return res.status(500).json({ message: 'Lỗi server. Vui lòng thử lại.' });
+    console.error("[register]", err);
+    return res.status(500).json({ message: "Lỗi server. Vui lòng thử lại." });
   }
 };
 
@@ -52,7 +56,7 @@ exports.login = async (req, res) => {
   const { identifier, password } = req.body; // identifier = email hoặc username
 
   if (!identifier || !password) {
-    return res.status(400).json({ message: 'Vui lòng nhập đầy đủ thông tin.' });
+    return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin." });
   }
 
   try {
@@ -63,11 +67,11 @@ exports.login = async (req, res) => {
        LEFT JOIN roles r ON u.role_id = r.id
        WHERE u.email = ? OR u.username = ?
        LIMIT 1`,
-      [identifier, identifier]
+      [identifier, identifier],
     );
 
     if (rows.length === 0) {
-      return res.status(401).json({ message: 'Tài khoản không tồn tại.' });
+      return res.status(401).json({ message: "Tài khoản không tồn tại." });
     }
 
     const user = rows[0];
@@ -75,18 +79,18 @@ exports.login = async (req, res) => {
     // So sánh mật khẩu
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Mật khẩu không chính xác.' });
+      return res.status(401).json({ message: "Mật khẩu không chính xác." });
     }
 
     // Tạo JWT
     const token = jwt.sign(
       { id: user.id, role: user.role_name },
-      process.env.JWT_SECRET || 'your_jwt_secret',
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      process.env.JWT_SECRET || "your_jwt_secret",
+      { expiresIn: process.env.JWT_EXPIRES_IN || "7d" },
     );
 
     return res.status(200).json({
-      message: 'Đăng nhập thành công!',
+      message: "Đăng nhập thành công!",
       token,
       user: {
         id: user.id,
@@ -98,8 +102,8 @@ exports.login = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('[login]', err);
-    return res.status(500).json({ message: 'Lỗi server. Vui lòng thử lại.' });
+    console.error("[login]", err);
+    return res.status(500).json({ message: "Lỗi server. Vui lòng thử lại." });
   }
 };
 
@@ -112,12 +116,60 @@ exports.getMe = async (req, res) => {
       `SELECT u.id, u.username, u.email, u.full_name, u.language, u.created_at, r.role_name
        FROM users u LEFT JOIN roles r ON u.role_id = r.id
        WHERE u.id = ?`,
-      [req.user.id]
+      [req.user.id],
     );
-    if (rows.length === 0) return res.status(404).json({ message: 'User không tồn tại.' });
+    if (rows.length === 0)
+      return res.status(404).json({ message: "User không tồn tại." });
     return res.json(rows[0]);
   } catch (err) {
-    console.error('[getMe]', err);
-    return res.status(500).json({ message: 'Lỗi server.' });
+    console.error("[getMe]", err);
+    return res.status(500).json({ message: "Lỗi server." });
+  }
+};
+
+// ============================================================
+// ĐỔI MẬT KHẨU
+// ============================================================
+exports.changePassword = async (req, res) => {
+  const { current_password, new_password } = req.body;
+
+  if (!current_password || !new_password) {
+    return res
+      .status(400)
+      .json({ message: "Vui lòng nhập mật khẩu hiện tại và mật khẩu mới." });
+  }
+
+  if (String(new_password).length < 6) {
+    return res
+      .status(400)
+      .json({ message: "Mật khẩu mới phải có ít nhất 6 ký tự." });
+  }
+
+  try {
+    const [rows] = await db.query(
+      "SELECT id, password_hash FROM users WHERE id = ? LIMIT 1",
+      [req.user.id],
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "User không tồn tại." });
+    }
+
+    const user = rows[0];
+    const isMatch = await bcrypt.compare(current_password, user.password_hash);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Mật khẩu hiện tại không đúng." });
+    }
+
+    const passwordHash = await bcrypt.hash(new_password, 10);
+    await db.query("UPDATE users SET password_hash = ? WHERE id = ?", [
+      passwordHash,
+      req.user.id,
+    ]);
+
+    return res.json({ message: "Đổi mật khẩu thành công." });
+  } catch (err) {
+    console.error("[changePassword]", err);
+    return res.status(500).json({ message: "Lỗi server. Vui lòng thử lại." });
   }
 };

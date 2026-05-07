@@ -40,8 +40,12 @@ const mapBaseToPort = (value, port) => {
 const unique = (items) => [...new Set(items.filter(Boolean))];
 
 const buildConnectionInfo = (req) => {
-  const publicBaseUrl = normalizeBaseUrl(
-    process.env.PUBLIC_BASE_URL || process.env.BASE_URL || "",
+  const nodeBackendBaseUrl = normalizeBaseUrl(
+    process.env.NODE_BACKEND_URL ||
+      process.env.NODE_PUBLIC_BASE_URL ||
+      process.env.PUBLIC_BASE_URL ||
+      process.env.BASE_URL ||
+      "",
   );
   const cameraBaseUrl = normalizeBaseUrl(
     process.env.ALERT_IMAGE_PUBLIC_BASE_URL ||
@@ -56,8 +60,8 @@ const buildConnectionInfo = (req) => {
 
   const candidateBases = unique([
     cameraBaseUrl,
-    mapBaseToPort(publicBaseUrl, 5000),
-    publicBaseUrl,
+    mapBaseToPort(nodeBackendBaseUrl, 5000),
+    nodeBackendBaseUrl,
     mapBaseToPort(requestHost, 5000),
     "http://10.0.2.2:5000",
     "http://127.0.0.1:5000",
@@ -81,7 +85,7 @@ const buildConnectionInfo = (req) => {
     socket: {
       path: "/socket.io",
       event: "new_alert",
-      handshake_url: publicBaseUrl || requestHost || "",
+      handshake_url: nodeBackendBaseUrl || requestHost || "",
     },
   };
 };

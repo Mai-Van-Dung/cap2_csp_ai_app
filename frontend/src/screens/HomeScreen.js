@@ -23,7 +23,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { io } from "socket.io-client";
 import { useAuth } from "../context/AuthContext";
-import { alertsAPI } from "../services/api";
+import { alertsAPI, cameraModeAPI } from "../services/api";
 import {
   getCameraBaseCandidates,
   getSocketBaseCandidates,
@@ -45,6 +45,7 @@ const ALERT_MESSAGE = "PHÁT HIỆN XÂM NHẬP!";
 const ALERT_BUTTON_IDLE = "#16A34A";
 const ALERT_BUTTON_ACTIVE = "#DC2626";
 const CAMERA_RETRY_INTERVAL_MS = 10000;
+const CAMERA_ID = 1;
 
 const buildViewerUrl = (baseUrl) => getViewerUrl(baseUrl, "Camera chinh");
 const buildVideoFeedUrl = (baseUrl) =>
@@ -314,6 +315,8 @@ export default function HomeScreen({ navigation }) {
   const [toastVisible, setToastVisible] = useState(false);
   const [hasActiveAlarm, setHasActiveAlarm] = useState(false);
   const [recentAlerts, setRecentAlerts] = useState(MOCK_ALERTS);
+  const [supervisedMode, setSupervisedMode] = useState(false);
+  const [supervisedLoading, setSupervisedLoading] = useState(false);
   const [discoveryVersion, setDiscoveryVersion] = useState(0);
   const toastAnim = useRef(new Animated.Value(0)).current;
   const toastTimerRef = useRef(null);
@@ -638,6 +641,27 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  const toggleSupervisedMode = useCallback(async () => {
+    if (supervisedLoading) return;
+    try {
+      setSupervisedLoading(true);
+      const next = !supervisedMode;
+      const result = await cameraModeAPI.toggleSupervised(CAMERA_ID, next);
+      const updatedValue = Boolean(result?.supervised_mode);
+      setSupervisedMode(updatedValue);
+      Alert.alert(
+        "Chế độ bơi có giám sát",
+        updatedValue
+          ? "Đã BẬT chế độ có giám sát"
+          : "Đã TẮT chế độ có giám sát",
+      );
+    } catch (err) {
+      Alert.alert("Loi", err?.message || "Khong cap nhat duoc che do");
+    } finally {
+      setSupervisedLoading(false);
+    }
+  }, [supervisedLoading, supervisedMode]);
+
   const initial = user
     ? (
         user.full_name?.charAt(0) ||
@@ -789,6 +813,24 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={[
+            styles.supervisedToggleBtn,
+            { backgroundColor: supervisedMode ? "#0EA5A4" : "#64748B" },
+          ]}
+          onPress={() => requireAuth(toggleSupervisedMode)}
+          disabled={supervisedLoading}
+        >
+          <Text style={styles.supervisedToggleText}>
+            {supervisedLoading
+              ? "Dang cap nhat..."
+              : supervisedMode
+                ? "Chế độ bơi có giám sát: ĐANG BẬT"
+                : "Chế độ bơi có giám sát: ĐANG TẮT"}
+          </Text>
+        </TouchableOpacity>
+
         {/* ── THỜI TIẾT THỰC ──────────────────────────── */}
         <WeatherCard />
 
@@ -807,9 +849,9 @@ export default function HomeScreen({ navigation }) {
             showsHorizontalScrollIndicator={false}
             style={styles.alertsScroll}
           >
-            {recentAlerts.map((item) => (
+            {recentAlerts.map((item, index) => (
               <AlertThumb
-                key={item.id}
+                key={`${item.id ?? "na"}-${item.time ?? "na"}-${index}`}
                 item={item}
                 onPress={() => requireAuth(() => navigation.navigate("Alerts"))}
               />
@@ -1119,6 +1161,20 @@ const styles = StyleSheet.create({
   alertStatusBtnText: {
     color: "#FFF",
     fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
+
+  supervisedToggleBtn: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  supervisedToggleText: {
+    color: "#FFFFFF",
+    fontSize: 12,
     fontWeight: "800",
     letterSpacing: 0.6,
   },
