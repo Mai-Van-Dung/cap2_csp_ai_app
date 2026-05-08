@@ -3,6 +3,7 @@ import {
   getApiBaseCandidates,
   refreshConnectionInfo,
 } from "../config/endpoints";
+import { getAlertsApiBaseCandidates } from "../config/endpoints";
 
 let preferredBaseUrl = null;
 let unauthorizedHandler = null;
@@ -50,7 +51,18 @@ const request = async (endpoint, method = "GET", body = null, auth = false) => {
     connectionInfo?.preferred_base_url ||
     preferredBaseUrl;
 
-  const headers = { "Content-Type": "application/json" };
+  // For alerts endpoint, reject Flask base (port 5000) and use Node base only
+  const isAlertsEndpoint = endpoint.includes("alerts");
+  if (
+    isAlertsEndpoint &&
+    preferredBaseUrl &&
+    preferredBaseUrl.includes(":5000")
+  ) {
+    console.log("[request] Alerts endpoint: skipping Flask base (5000)");
+    preferredBaseUrl = null;
+  }
+
+  const headers = {};
 
   if (auth) {
     const token = await getStoredToken();
@@ -61,21 +73,36 @@ const request = async (endpoint, method = "GET", body = null, auth = false) => {
   }
 
   const options = { method, headers };
-  if (body) options.body = JSON.stringify(body);
+  if (body) {
+    headers["Content-Type"] = "application/json";
+    options.body = JSON.stringify(body);
+  }
+
+  // For alerts endpoint, use specialized candidates that prioritize Node backend (5003)
+  const candidateSource = isAlertsEndpoint
+    ? getAlertsApiBaseCandidates()
+    : getApiBaseCandidates();
+  console.log(`[API] endpoint=${endpoint}, isAlerts=${isAlertsEndpoint}`);
 
   const candidates = preferredBaseUrl
     ? [
         preferredBaseUrl,
-        ...getApiBaseCandidates().filter((u) => u !== preferredBaseUrl),
+        ...candidateSource.filter((u) => u !== preferredBaseUrl),
       ]
-    : getApiBaseCandidates();
+    : candidateSource;
+
+  console.log(
+    `[API] endpoint=${endpoint}, method=${method}, candidates=[${candidates.slice(0, 2).join(", ")}...]`,
+  );
 
   let lastNetworkError = null;
 
   for (const baseUrl of candidates) {
     let response;
+    const fullUrl = `${baseUrl}${endpoint}`;
+    console.log(`[API] trying: ${fullUrl}`);
     try {
-      response = await fetchWithTimeout(`${baseUrl}${endpoint}`, options);
+      response = await fetchWithTimeout(fullUrl, options);
     } catch (error) {
       lastNetworkError = error;
       continue;
@@ -148,8 +175,39 @@ export const authAPI = {
 
 // ── Alerts APIs ───────────────────────────────────────────
 export const alertsAPI = {
-  // Lấy toàn bộ danh sách alerts của user
-  getAll: () => request("/alerts", "GET", null, true),
+  // Lấy toàn bộ danh sách alerts của user từ Node backend (port 5003)
+  // Ưu tiên Node backend thay vì Flask (5000)
+  getAll: async () => {
+    const result = await request("/alerts", "GET", null, true);
+    console.log("[alertsAPI.getAll] raw result keys:", Object.keys(result));
+
+    // Normalize response format:
+    // Node backend returns: { success: true, data: [...] }
+    // Flask returns: { alerts: [...] }
+    // This function ensures: { data: [...] }
+
+    let alerts = [];
+    if (result.data && Array.isArray(result.data)) {
+      // Node format
+      alerts = result.data;
+      console.log(
+        "[alertsAPI.getAll] Node format detected, alerts count:",
+        alerts.length,
+      );
+    } else if (result.alerts && Array.isArray(result.alerts)) {
+      // Flask format
+      alerts = result.alerts;
+      console.log(
+        "[alertsAPI.getAll] Flask format detected, alerts count:",
+        alerts.length,
+      );
+    } else {
+      console.warn("[alertsAPI.getAll] Unknown format");
+      alerts = [];
+    }
+
+    return { data: alerts, success: true };
+  },
 
   // Đánh dấu alert đã xử lý
   resolve: (id) => request(`/alerts/${id}/resolve`, "PATCH", null, true),

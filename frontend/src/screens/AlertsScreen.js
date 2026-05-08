@@ -262,38 +262,79 @@ export default function AlertsScreen({ navigation }) {
     else action?.();
   };
 
-  const fetchAlerts = useCallback(async (isRefresh = false) => {
-    try {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-      setError(null);
-      const res = await alertsAPI.getAll();
-      const incoming = res.data || [];
-      setAlerts(incoming);
-      const imageUrl = incoming.find((a) => !!a.image_url)?.image_url;
-      if (imageUrl) {
-        try {
-          const hostname = new URL(imageUrl).hostname;
-          if (
-            hostname &&
-            hostname !== "localhost" &&
-            hostname !== "127.0.0.1"
-          ) {
-            setSocketHostHint((prev) => prev || hostname);
+  const fetchAlerts = useCallback(
+    async (isRefresh = false) => {
+      try {
+        if (isRefresh) setRefreshing(true);
+        else setLoading(true);
+        setError(null);
+
+        // Guard: only fetch if user is logged in
+        if (!user) {
+          console.log("[fetchAlerts] User not logged in, skipping API call");
+          setAlerts([]);
+          return;
+        }
+
+        console.log("[fetchAlerts] Fetching alerts for user:", user.id);
+        const res = await alertsAPI.getAll();
+        console.log("[fetchAlerts] API response:", res);
+
+        const incoming = res.data || [];
+        console.log("[fetchAlerts] Alerts count:", incoming.length);
+        setAlerts(incoming);
+
+        // Extract hostname from first alert's image URL for socket hint
+        const imageUrl = incoming.find((a) => !!a.image_url)?.image_url;
+        if (imageUrl) {
+          try {
+            const hostname = new URL(imageUrl).hostname;
+            if (
+              hostname &&
+              hostname !== "localhost" &&
+              hostname !== "127.0.0.1"
+            ) {
+              console.log("[fetchAlerts] Using socket hint:", hostname);
+              setSocketHostHint((prev) => prev || hostname);
+            }
+          } catch (e) {
+            console.warn("[fetchAlerts] Error parsing image URL:", e);
           }
-        } catch {}
+        }
+      } catch (err) {
+        const message = err.message || "Không thể tải dữ liệu";
+        console.error("[fetchAlerts] Error:", message);
+
+        // Check if token expired (401)
+        if (
+          message.includes("401") ||
+          message.includes("hết hạn") ||
+          message.includes("đăng nhập")
+        ) {
+          console.log("[fetchAlerts] Token expired, redirecting to login");
+          setError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+          setTimeout(() => navigation.navigate("Login"), 1000);
+        } else {
+          setError(message);
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-    } catch (err) {
-      setError(err.message || "Không thể tải dữ liệu");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+    },
+    [user, navigation],
+  );
 
   useFocusEffect(
     useCallback(() => {
-      if (user) fetchAlerts(true);
+      console.log("[AlertsScreen] Focus effect, user:", user?.id);
+      if (user) {
+        fetchAlerts(true);
+      } else {
+        console.log("[AlertsScreen] User not logged in");
+        setAlerts([]);
+        setError(null);
+      }
     }, [fetchAlerts, user]),
   );
 

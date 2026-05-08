@@ -12,6 +12,49 @@ const pool = require("./config/database");
 const app = express();
 const server = http.createServer(app);
 
+const defaultAllowedOrigins = [
+  "http://localhost:8081",
+  "http://127.0.0.1:8081",
+  "http://localhost:19006",
+  "http://127.0.0.1:19006",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
+
+const envAllowedOrigins = String(process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+
+const allowedOrigins = new Set([
+  ...defaultAllowedOrigins,
+  ...envAllowedOrigins,
+]);
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    if (allowedOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    const isLanOrigin =
+      /^https?:\/\/(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+)(:\d+)?$/i.test(
+        origin,
+      );
+    callback(null, isLanOrigin);
+  },
+  methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+
 const trimTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");
 
 const isHttpUrl = (value) => /^https?:\/\//i.test(String(value || ""));
@@ -91,7 +134,8 @@ const buildConnectionInfo = (req) => {
 };
 
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 

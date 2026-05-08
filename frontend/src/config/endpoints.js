@@ -263,8 +263,13 @@ const buildDiscoverySeedBaseUrls = () => {
     "VITE_BACKEND_BASE_URL",
   );
 
+  const explicitBackendOrigin = toOrigin(explicitBackendBaseUrl);
+  const explicitAlertsOrigin = toOrigin(derivedApiBase);
+
   return unique(
     [
+      stripTrailingSlash(explicitBackendOrigin),
+      stripTrailingSlash(explicitAlertsOrigin),
       stripTrailingSlash(explicitCameraBaseUrl),
       stripTrailingSlash(
         mapBaseToPort(explicitBackendBaseUrl, DEFAULT_FLASK_PORT),
@@ -402,16 +407,15 @@ const mapPythonBasesToNodeApiBases = (bases) => {
     .filter(Boolean);
 };
 
-export const getApiBaseCandidates = () => {
+export const getAlertsApiBaseCandidates = () => {
+  // For alerts endpoint, prioritize Node backend (5003) over Flask (5000)
   const explicitAlertsApiUrl = readEnv(
     "EXPO_PUBLIC_ALERTS_API_URL",
     "VITE_ALERTS_API_URL",
   );
-
-  if (explicitAlertsApiUrl) {
-    const derived = deriveApiBaseFromUrl(explicitAlertsApiUrl);
-    if (derived) return [derived];
-  }
+  const explicitAlertsApiBase = explicitAlertsApiUrl
+    ? deriveApiBaseFromUrl(explicitAlertsApiUrl)
+    : "";
 
   const backendBaseUrl = readEnv(
     "EXPO_PUBLIC_BACKEND_URL",
@@ -419,9 +423,57 @@ export const getApiBaseCandidates = () => {
     "VITE_BACKEND_BASE_URL",
   );
 
-  if (backendBaseUrl) {
-    return [`${stripTrailingSlash(backendBaseUrl)}/api`];
+  const hosts = getSeedHosts();
+  const nodePort = getNodePort();
+
+  // ✅ Prioritize explicit Node backend + alerts API
+  const candidates = [];
+
+  if (explicitAlertsApiBase) {
+    candidates.push(explicitAlertsApiBase);
   }
+
+  if (backendBaseUrl) {
+    const nodeBackend = `${stripTrailingSlash(backendBaseUrl)}/api`;
+    if (!candidates.includes(nodeBackend)) {
+      candidates.push(nodeBackend);
+    }
+  }
+
+  // Add Node backend candidates (5003) before Flask (5000)
+  candidates.push(
+    ...hosts
+      .map((host) => `http://${host}:${nodePort}/api`)
+      .filter((u) => !candidates.includes(u)),
+  );
+
+  // Add localhost Node API
+  candidates.push(
+    ...buildHostCandidates({
+      port: nodePort,
+      includeLocalhost: Platform.OS === "web",
+    })
+      .map((baseUrl) => `${stripTrailingSlash(baseUrl)}/api`)
+      .filter((u) => !candidates.includes(u)),
+  );
+
+  return unique(candidates);
+};
+
+export const getApiBaseCandidates = () => {
+  const explicitAlertsApiUrl = readEnv(
+    "EXPO_PUBLIC_ALERTS_API_URL",
+    "VITE_ALERTS_API_URL",
+  );
+  const explicitAlertsApiBase = explicitAlertsApiUrl
+    ? deriveApiBaseFromUrl(explicitAlertsApiUrl)
+    : "";
+
+  const backendBaseUrl = readEnv(
+    "EXPO_PUBLIC_BACKEND_URL",
+    "EXPO_PUBLIC_BACKEND_BASE_URL",
+    "VITE_BACKEND_BASE_URL",
+  );
 
   const hosts = getSeedHosts();
   const discoveredPythonBases = getDiscoveredBaseCandidates();
@@ -429,7 +481,18 @@ export const getApiBaseCandidates = () => {
     discoveredPythonBases,
   );
 
+  const explicitApiCandidates = [];
+
+  if (backendBaseUrl) {
+    explicitApiCandidates.push(`${stripTrailingSlash(backendBaseUrl)}/api`);
+  }
+
+  if (explicitAlertsApiBase) {
+    explicitApiCandidates.push(explicitAlertsApiBase);
+  }
+
   return unique([
+    ...explicitApiCandidates,
     ...derivedNodeApiBases,
     ...hosts.map((host) => `http://${host}:${getNodePort()}/api`),
     ...buildHostCandidates({
