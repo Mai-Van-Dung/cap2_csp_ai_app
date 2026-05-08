@@ -329,10 +329,12 @@ export default function HomeScreen({ navigation }) {
     const socketPath = getSocketPath();
     if (Platform.OS === "web") {
       return {
-        transports: ["polling"],
-        upgrade: false,
+        transports: ["websocket", "polling"],
+        upgrade: true,
         timeout: 4000,
-        reconnection: false,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
         forceNew: false,
         path: socketPath,
       };
@@ -340,20 +342,17 @@ export default function HomeScreen({ navigation }) {
     return {
       transports: ["websocket"],
       timeout: 4000,
-      reconnection: false,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
       forceNew: false,
       path: socketPath,
     };
   }, []);
   const socketCandidates = useMemo(() => {
-    const fallbackCandidates = getSocketBaseCandidates();
-    if (!cameraBaseUrl) return fallbackCandidates;
-
-    return [
-      cameraBaseUrl,
-      ...fallbackCandidates.filter((candidate) => candidate !== cameraBaseUrl),
-    ];
-  }, [cameraBaseUrl, discoveryVersion]);
+    // Socket must always connect to Node relay (5003), never camera base (5000).
+    return getSocketBaseCandidates();
+  }, [discoveryVersion]);
 
   const showIntrusionToast = useCallback(() => {
     setHasActiveAlarm(true);

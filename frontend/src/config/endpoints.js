@@ -6,7 +6,7 @@ const DISCOVERY_PATH = "/api/connection-info";
 const DISCOVERY_TIMEOUT_MS = 2800;
 const DISCOVERY_CACHE_TTL_MS = 2 * 60 * 1000;
 
-export const DEFAULT_SOCKET_PORT = DEFAULT_FLASK_PORT;
+export const DEFAULT_SOCKET_PORT = DEFAULT_NODE_PORT;
 
 let cachedConnectionInfo = null;
 let cachedConnectionInfoAt = 0;
@@ -510,19 +510,54 @@ export const getSocketBaseCandidates = () => {
     "VITE_SOCKET_BASE_URL",
   );
 
-  const candidates = [
-    ...getDiscoveredBaseCandidates(),
-    getDiscoveredSocketBase(),
-  ];
+  const candidates = [];
+  const nodePort = getNodePort();
 
+  // ✅ 1. Prioritize explicit socket base URL first (should be Node relay on 5003)
   if (explicitSocketBaseUrl) {
-    candidates.push(stripTrailingSlash(explicitSocketBaseUrl));
+    const normalized = stripTrailingSlash(explicitSocketBaseUrl);
+    if (normalized.includes(`:${nodePort}`) || normalized.includes(":5003")) {
+      candidates.push(normalized);
+    }
   }
 
-  const apiOrigins = getApiBaseCandidates().map(toOrigin).filter(Boolean);
-  candidates.push(...apiOrigins);
-  candidates.push(...getCameraBaseCandidates());
-  return unique(candidates.map((u) => stripTrailingSlash(u)));
+  // ✅ 2. Map discovered bases to Node relay port (5003)
+  const discoveredBases = getDiscoveredBaseCandidates();
+  const nodeSockets = discoveredBases
+    .map((base) => {
+      try {
+        const parsed = new URL(base);
+        // Always use Node relay port for socket, not Flask
+        return `${parsed.protocol}//${parsed.hostname}:${nodePort}`;
+      } catch {
+        return "";
+      }
+    })
+    .filter(Boolean);
+  candidates.push(...unique(nodeSockets));
+
+  // ✅ 3. Add discovered socket base (if it's on correct port)
+  const discoveredSocket = getDiscoveredSocketBase();
+  if (discoveredSocket) {
+    const normalized = stripTrailingSlash(discoveredSocket);
+    // Only add if it's on Node port (5003) not Flask (5000)
+    if (
+      normalized.includes(`:${nodePort}`) ||
+      normalized.includes(":5003") ||
+      !normalized.includes(":5000")
+    ) {
+      candidates.push(normalized);
+    }
+  }
+
+  // ✅ 4. Remove any Flask (5000) candidates and duplicates
+  const filtered = unique(
+    candidates
+      .map((u) => stripTrailingSlash(u))
+      .filter((u) => !u.includes(":5000")), // Explicitly exclude Flask
+  );
+
+  return filtered;
 };
 
 export const getSocketPath = () => {
@@ -533,9 +568,19 @@ export const getSocketPath = () => {
   return explicitSocketPath || "/socket.io";
 };
 
-export const getSocketOriginFromHostname = (hostname) => {
-  if (!hostname) return "";
-  return `http://${hostname}:${DEFAULT_SOCKET_PORT}`;
+export const getSocketOriginFromHostname = (hostnameOrUrl) => {
+  if (!hostnameOrUrl) return "";
+
+  const nodePort = getNodePort();
+  const raw = String(hostnameOrUrl).trim();
+  if (!raw) return "";
+
+  try {
+    const parsed = new URL(raw);
+    return `${parsed.protocol}//${parsed.hostname}:${nodePort}`;
+  } catch {
+    return `http://${raw}:${nodePort}`;
+  }
 };
 
 export const getViewerUrl = (baseUrl, label = "Camera chinh") => {

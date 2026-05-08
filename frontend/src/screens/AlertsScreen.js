@@ -217,10 +217,12 @@ export default function AlertsScreen({ navigation }) {
     const socketPath = getSocketPath();
     if (Platform.OS === "web") {
       return {
-        transports: ["polling"],
-        upgrade: false,
+        transports: ["websocket", "polling"],
+        upgrade: true,
         timeout: 4000,
-        reconnection: false,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
         forceNew: false,
         path: socketPath,
       };
@@ -228,7 +230,9 @@ export default function AlertsScreen({ navigation }) {
     return {
       transports: ["websocket"],
       timeout: 4000,
-      reconnection: false,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
       forceNew: false,
       path: socketPath,
     };
@@ -236,11 +240,7 @@ export default function AlertsScreen({ navigation }) {
 
   const socketCandidates = React.useMemo(() => {
     if (socketHostHint) {
-      try {
-        return [new URL(socketHostHint).origin];
-      } catch {
-        return [getSocketOriginFromHostname(socketHostHint)];
-      }
+      return [getSocketOriginFromHostname(socketHostHint)];
     }
     return getSocketBaseCandidates();
   }, [socketHostHint, discoveryVersion]);
@@ -333,7 +333,16 @@ export default function AlertsScreen({ navigation }) {
           continue;
         }
         activeSocket = socket;
-        socket.on("new_alert", () => fetchAlerts(true));
+        socket.on("new_alert", (payload) => {
+          console.log("[AlertsScreen] Received new_alert event:", payload);
+          fetchAlerts(true);
+        });
+        socket.on("disconnect", (reason) => {
+          console.log("[AlertsScreen] Socket disconnected:", reason);
+        });
+        socket.on("connect_error", (error) => {
+          console.log("[AlertsScreen] Socket error:", error?.message || error);
+        });
         return;
       }
       if (!cancelled && mounted) retryTimer = setTimeout(connectSocket, 10000);
@@ -357,6 +366,8 @@ export default function AlertsScreen({ navigation }) {
       }
       if (activeSocket) {
         activeSocket.off("new_alert");
+        activeSocket.off("disconnect");
+        activeSocket.off("connect_error");
         activeSocket.disconnect();
       }
     };
