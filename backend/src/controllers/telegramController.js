@@ -318,12 +318,21 @@ const testNotification = async (req, res) => {
 const notifyAlert = async (payload = {}) => {
   const objectType = payload.objectType || payload.object_type;
   const cameraName = payload.cameraName || payload.camera_name;
+  const cameraId = payload.cameraId || payload.camera_id;
   const confidence = payload.confidence;
   const imagePath = payload.imagePath || payload.image_path;
   const imageUrl = payload.imageUrl || payload.image_url;
   const imageUrls = payload.imageUrls || payload.image_urls || [];
   const imageBase64 = payload.imageBase64 || payload.image_base64;
   const imageFilename = payload.imageFilename || payload.image_filename;
+  const message = payload.message;
+  const eventType = payload.eventType || payload.event_type;
+  const status = payload.status;
+  const reason = payload.reason;
+  const createdAt = payload.createdAt || payload.created_at;
+
+  const isCameraDisconnect =
+    objectType === "CAMERA_OFFLINE" || eventType === "camera_disconnect";
 
   const recipientIds = await getAlertRecipientChatIds();
   if (recipientIds.length === 0) {
@@ -334,18 +343,28 @@ const notifyAlert = async (payload = {}) => {
   }
 
   const pct = Math.round((confidence || 0) * 100);
-  const time = new Date().toLocaleString("vi-VN");
-  const caption =
-    `CẢNH BÁO XÂM NHẬP!\n\n` +
-    `Đối tượng: ${objectType || "Không xác định"}\n` +
-    `Camera: ${cameraName || "Camera chính"}\n` +
-    `Độ chính xác: ${pct}%\n` +
-    `Thời gian: ${time}`;
+  const eventTime = createdAt
+    ? new Date(createdAt).toLocaleString("vi-VN")
+    : new Date().toLocaleString("vi-VN");
+  const caption = isCameraDisconnect
+    ? message ||
+      `🚨 CAMERA DISCONNECTED\n\n` +
+        `Camera: ${cameraName || "Camera"}${cameraId ? ` (#${cameraId})` : ""}\n` +
+        `Trạng thái: ${status || "offline"}\n` +
+        `Lý do: ${reason || "Mất kết nối"}\n` +
+        `Thời gian: ${eventTime}`
+    : `CẢNH BÁO XÂM NHẬP!\n\n` +
+      `Đối tượng: ${objectType || "Không xác định"}\n` +
+      `Camera: ${cameraName || "Camera chính"}\n` +
+      `Độ chính xác: ${pct}%\n` +
+      `Thời gian: ${eventTime}`;
 
   let sent = 0;
   let failed = 0;
 
-  const hasImagePayload = Boolean(imagePath || imageUrl || imageBase64);
+  // Infrastructure events should be text-first even when image fields are absent.
+  const hasImagePayload =
+    !isCameraDisconnect && Boolean(imagePath || imageUrl || imageBase64);
 
   for (const chatId of recipientIds) {
     if (hasImagePayload) {

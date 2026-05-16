@@ -59,6 +59,47 @@ const formatTime = (isoString) => {
   return date.toLocaleDateString("vi-VN");
 };
 
+const isCameraDisconnectAlert = (item) =>
+  item?.event_type === "camera_disconnect" ||
+  item?.object_type === "CAMERA_OFFLINE";
+
+const toRealtimeAlertItem = (payload = {}) => {
+  const isDisconnect =
+    payload?.event_type === "camera_disconnect" ||
+    payload?.object_type === "CAMERA_OFFLINE";
+
+  const createdAt = payload?.created_at || new Date().toISOString();
+  const reason = payload?.reason || null;
+  const message =
+    payload?.message ||
+    (isDisconnect
+      ? `Camera ${payload?.camera_name || "Camera"} mất kết nối${reason ? `: ${reason}` : ""}`
+      : null);
+
+  return {
+    id:
+      payload?.id ||
+      `rt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    object_type:
+      payload?.object_type || (isDisconnect ? "CAMERA_OFFLINE" : "unknown"),
+    event_type: isDisconnect
+      ? "camera_disconnect"
+      : payload?.event_type || "intrusion",
+    camera_name: payload?.camera_name || "Camera",
+    zone_name: payload?.zone_name || null,
+    confidence:
+      typeof payload?.confidence === "number" ? payload.confidence : null,
+    image_path: payload?.image_path || null,
+    image_url: payload?.image_url || null,
+    image_urls: Array.isArray(payload?.image_urls) ? payload.image_urls : [],
+    message,
+    status: payload?.status || (isDisconnect ? "offline" : null),
+    reason,
+    created_at: createdAt,
+    is_realtime: true,
+  };
+};
+
 // ── Image Viewer ──────────────────────────────────────────
 const ImageViewer = ({ uri, visible, onClose }) => (
   <Modal
@@ -88,10 +129,13 @@ const ImageViewer = ({ uri, visible, onClose }) => (
 
 // ── Alert Card ────────────────────────────────────────────
 const AlertItem = ({ item }) => {
-  const severity = getSeverity(item.confidence);
+  const isDisconnect = isCameraDisconnectAlert(item);
+  const severity = isDisconnect
+    ? { label: "HẠ TẦNG", color: "#DC2626", bar: "#DC2626" }
+    : getSeverity(item.confidence || 0);
   const imageCandidates = React.useMemo(
-    () => getAlertImageCandidates(item),
-    [item],
+    () => (isDisconnect ? [] : getAlertImageCandidates(item)),
+    [isDisconnect, item],
   );
   const [imageIndex, setImageIndex] = useState(0);
   const [viewing, setViewing] = useState(false);
@@ -108,6 +152,14 @@ const AlertItem = ({ item }) => {
   }, [imageCandidates.length]);
 
   const confidencePct = Math.round((item.confidence || 0) * 100);
+  const displayTitle = isDisconnect
+    ? "CAMERA MẤT KẾT NỐI"
+    : item.object_type || "Đối tượng không xác định";
+  const displayMeta = isDisconnect
+    ? [item.camera_name, item.reason || item.message]
+        .filter(Boolean)
+        .join("  ·  ")
+    : [item.camera_name, item.zone_name].filter(Boolean).join("  ·  ");
 
   return (
     <View style={styles.card}>
@@ -169,34 +221,44 @@ const AlertItem = ({ item }) => {
             <Text style={styles.timeText}>{formatTime(item.created_at)}</Text>
           </View>
 
-          {/* Tên đối tượng */}
-          <Text style={styles.objectTitle}>
-            {item.object_type || "Đối tượng không xác định"}
-          </Text>
+          {/* Tên cảnh báo */}
+          <Text style={styles.objectTitle}>{displayTitle}</Text>
 
-          {/* Camera + zone */}
-          <Text style={styles.metaText}>
-            {[item.camera_name, item.zone_name].filter(Boolean).join("  ·  ")}
-          </Text>
+          {/* Camera + zone/reason */}
+          <Text style={styles.metaText}>{displayMeta}</Text>
+
+          {isDisconnect && item.message ? (
+            <Text style={styles.disconnectMessage}>{item.message}</Text>
+          ) : null}
 
           {/* Thanh độ chính xác */}
-          <View style={styles.confRow}>
-            <Text style={styles.confLabel}>{"Độ chính xác"}</Text>
-            <Text style={[styles.confValue, { color: severity.color }]}>
-              {`${confidencePct}%`}
-            </Text>
-          </View>
-          <View style={styles.confBarBg}>
-            <View
-              style={[
-                styles.confBarFill,
-                {
-                  width: `${confidencePct}%`,
-                  backgroundColor: severity.color,
-                },
-              ]}
-            />
-          </View>
+          {isDisconnect ? (
+            <View style={styles.disconnectPill}>
+              <Text style={styles.disconnectPillText}>
+                {`Trạng thái: ${item.status || "offline"}`}
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.confRow}>
+                <Text style={styles.confLabel}>{"Độ chính xác"}</Text>
+                <Text style={[styles.confValue, { color: severity.color }]}>
+                  {`${confidencePct}%`}
+                </Text>
+              </View>
+              <View style={styles.confBarBg}>
+                <View
+                  style={[
+                    styles.confBarFill,
+                    {
+                      width: `${confidencePct}%`,
+                      backgroundColor: severity.color,
+                    },
+                  ]}
+                />
+              </View>
+            </>
+          )}
         </View>
       </View>
     </View>
@@ -376,6 +438,26 @@ export default function AlertsScreen({ navigation }) {
         activeSocket = socket;
         socket.on("new_alert", (payload) => {
           console.log("[AlertsScreen] Received new_alert event:", payload);
+          const isDisconnect =
+            payload?.event_type === "camera_disconnect" ||
+            payload?.object_type === "CAMERA_OFFLINE";
+
+          if (isDisconnect) {
+            const incoming = toRealtimeAlertItem(payload);
+            setAlerts((prev) => {
+              const deduped = prev.filter(
+                (item) =>
+                  !(
+                    item?.created_at === incoming.created_at &&
+                    item?.camera_name === incoming.camera_name &&
+                    isCameraDisconnectAlert(item)
+                  ),
+              );
+              return [incoming, ...deduped];
+            });
+            return;
+          }
+
           fetchAlerts(true);
         });
         socket.on("disconnect", (reason) => {
@@ -599,6 +681,26 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   metaText: { fontSize: 12, color: TEXT2, marginBottom: 12 },
+  disconnectMessage: {
+    fontSize: 12,
+    color: "#7F1D1D",
+    marginBottom: 10,
+    lineHeight: 18,
+  },
+  disconnectPill: {
+    alignSelf: "flex-start",
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  disconnectPillText: {
+    fontSize: 11,
+    color: "#B91C1C",
+    fontWeight: "700",
+  },
 
   // Confidence bar
   confRow: {

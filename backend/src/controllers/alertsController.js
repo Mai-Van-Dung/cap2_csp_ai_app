@@ -122,6 +122,7 @@ const receiveAlert = async (req, res) => {
     const {
       object_type,
       camera_name,
+      camera_id,
       zone_id,
       confidence,
       image_path,
@@ -131,6 +132,10 @@ const receiveAlert = async (req, res) => {
       image_filename,
       message,
       source,
+      event_type,
+      status,
+      reason,
+      created_at,
       secret, // khoá bí mật để xác thực từ Python
     } = req.body;
 
@@ -156,17 +161,31 @@ const receiveAlert = async (req, res) => {
     ];
     const relayImageUrl = relayImageUrls[0] || null;
 
+    const isCameraDisconnect =
+      object_type === "CAMERA_OFFLINE" || event_type === "camera_disconnect";
+
+    const normalizedCreatedAt = created_at || new Date().toISOString();
+    const normalizedMessage =
+      message ||
+      (isCameraDisconnect
+        ? `CAMERA DISCONNECTED: ${camera_name || "Camera"}${reason ? `. Reason: ${reason}` : ""}`
+        : null);
+
     const socketPayload = {
       object_type: object_type || "unknown",
       camera_name: camera_name || "Camera",
+      camera_id: camera_id ?? null,
       zone_id: zone_id || null,
       confidence: confidence ?? null,
       image_path: image_path || null,
       image_url: relayImageUrl,
       image_urls: relayImageUrls,
-      message: message || null,
-      created_at: new Date().toISOString(),
+      message: normalizedMessage,
+      created_at: normalizedCreatedAt,
       source: source || "python-backend",
+      event_type: isCameraDisconnect ? "camera_disconnect" : "intrusion",
+      status: status || (isCameraDisconnect ? "offline" : null),
+      reason: reason || null,
     };
 
     const socketEmitted = broadcastNewAlert(socketPayload);
@@ -175,12 +194,19 @@ const receiveAlert = async (req, res) => {
     const telegram = await notifyAlert({
       objectType: object_type,
       cameraName: camera_name,
+      cameraId: camera_id,
       confidence,
       imagePath: image_path,
       imageUrl: relayImageUrl,
       imageUrls: relayImageUrls,
       imageBase64: image_base64,
       imageFilename: image_filename,
+      message: normalizedMessage,
+      source,
+      eventType: event_type,
+      status,
+      reason,
+      createdAt: normalizedCreatedAt,
     });
 
     res.json({ ok: true, telegram, socket_emitted: socketEmitted });
