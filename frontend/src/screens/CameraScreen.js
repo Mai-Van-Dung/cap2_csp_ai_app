@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   View, Text, StyleSheet,
- StatusBar, TouchableOpacity,
+ StatusBar, TouchableOpacity, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,17 @@ const TEXT1  = '#0F172A';
 const TEXT2  = '#475569';
 const TEXT3  = '#94A3B8';
 const BORDER = '#E5E7EB';
+
+const createShadow = (y, blur, opacity, elevation) =>
+  Platform.OS === 'web'
+    ? { boxShadow: `0px ${y}px ${blur * 2}px rgba(0, 0, 0, ${opacity})` }
+    : {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: y },
+        shadowOpacity: opacity,
+        shadowRadius: blur,
+        elevation,
+      };
 
 const IconCamera = ({ size = 60, color = '#999' }) => (
   <View style={{ width: size, height: size * 0.75, position: 'relative' }}>
@@ -112,7 +123,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16, borderWidth: 1, borderColor: BORDER,
     overflow: 'hidden', marginBottom: 16,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
+    ...createShadow(3, 10, 0.06, 3),
   },
   feedFrame: {
     height: 220, backgroundColor: '#EAECEF',

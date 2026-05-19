@@ -4,6 +4,7 @@ const path = require("path");
 const http = require("http");
 const authRoutes = require("./routes/authRoutes");
 const alertsRoutes = require("./routes/alertsRoutes");
+const cameraRoutes = require("./routes/cameraRoutes");
 const bodyParser = require("body-parser");
 const telegramRoutes = require("./routes/telegramRoutes");
 const { initSocket } = require("./realtime/socket");
@@ -100,18 +101,24 @@ const buildConnectionInfo = (req) => {
   const requestHost = normalizeBaseUrl(
     `${req.headers["x-forwarded-proto"] || req.protocol}://${req.get("host")}`,
   );
+  const cameraViewerBaseUrl =
+    cameraBaseUrl ||
+    mapBaseToPort(nodeBackendBaseUrl, 5000) ||
+    mapBaseToPort(requestHost, 5000) ||
+    "";
 
   const candidateBases = unique([
+    nodeBackendBaseUrl,
+    requestHost,
     cameraBaseUrl,
     mapBaseToPort(nodeBackendBaseUrl, 5000),
-    nodeBackendBaseUrl,
     mapBaseToPort(requestHost, 5000),
     "http://10.0.2.2:5000",
     "http://127.0.0.1:5000",
     "http://localhost:5000",
   ]).filter(isHttpUrl);
 
-  const preferredBaseUrl = candidateBases[0] || "";
+  const preferredBaseUrl = nodeBackendBaseUrl || requestHost || candidateBases[0] || "";
 
   return {
     status: "success",
@@ -121,8 +128,8 @@ const buildConnectionInfo = (req) => {
       viewer_path: "/viewer/camera",
       video_feed_path: "/video_feed",
       status_path: "/status",
-      viewer_url: preferredBaseUrl
-        ? `${trimTrailingSlash(preferredBaseUrl)}/viewer/camera?label=${encodeURIComponent("Camera chinh")}`
+      viewer_url: cameraViewerBaseUrl
+        ? `${trimTrailingSlash(cameraViewerBaseUrl)}/viewer/camera?label=${encodeURIComponent("Camera chinh")}`
         : "",
     },
     socket: {
@@ -157,6 +164,7 @@ app.get("/api/health", (req, res) => {
 });
 app.use("/api/auth", authRoutes);
 app.use("/api/alerts", alertsRoutes);
+app.use("/api/camera", cameraRoutes);
 app.use("/api/telegram", telegramRoutes);
 app.use("/static", express.static(path.join(__dirname, "../static")));
 

@@ -47,6 +47,17 @@ const ALERT_BUTTON_ACTIVE = "#DC2626";
 const CAMERA_RETRY_INTERVAL_MS = 10000;
 const CAMERA_ID = 1;
 
+const createShadow = (y, blur, opacity, elevation) =>
+  Platform.OS === "web"
+    ? { boxShadow: `0px ${y}px ${blur * 2}px rgba(0, 0, 0, ${opacity})` }
+    : {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: y },
+        shadowOpacity: opacity,
+        shadowRadius: blur,
+        elevation,
+      };
+
 const buildViewerUrl = (baseUrl) => getViewerUrl(baseUrl, "Camera chinh");
 const buildVideoFeedUrl = (baseUrl) =>
   `${String(baseUrl || "").replace(/\/+$/, "")}/video_feed`;
@@ -67,6 +78,20 @@ const formatAlertTime = (isoString) => {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+  });
+};
+
+const formatSnapshotTime = (isoString) => {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   });
 };
 
@@ -317,6 +342,9 @@ export default function HomeScreen({ navigation }) {
   const [recentAlerts, setRecentAlerts] = useState(MOCK_ALERTS);
   const [supervisedMode, setSupervisedMode] = useState(false);
   const [supervisedLoading, setSupervisedLoading] = useState(false);
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [latestSnapshot, setLatestSnapshot] = useState(null);
+  const [showSnapshotModal, setShowSnapshotModal] = useState(false);
   const [discoveryVersion, setDiscoveryVersion] = useState(0);
   const toastAnim = useRef(new Animated.Value(0)).current;
   const toastTimerRef = useRef(null);
@@ -431,14 +459,13 @@ export default function HomeScreen({ navigation }) {
 
       for (const baseUrl of cameraCandidates) {
         try {
-          const probeUrls = [
-            `${baseUrl}/status`,
+          const streamProbeUrls = [
             buildViewerUrl(baseUrl),
             buildVideoFeedUrl(baseUrl),
           ];
 
           let baseReachable = false;
-          for (const probeUrl of probeUrls) {
+          for (const probeUrl of streamProbeUrls) {
             console.log(`[Camera Probe] Trying ${probeUrl}`);
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 2200);
@@ -460,6 +487,9 @@ export default function HomeScreen({ navigation }) {
           }
 
           if (!baseReachable) {
+            console.log(
+              `[Camera Probe] Rejecting ${baseUrl} because camera stream endpoints are unreachable`,
+            );
             continue;
           }
 
@@ -504,6 +534,34 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     fetchRecentAlerts();
   }, [fetchRecentAlerts]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadSupervisedMode = async () => {
+      if (!user) {
+        if (mounted) setSupervisedMode(false);
+        return;
+      }
+
+      try {
+        const result = await cameraModeAPI.getSupervisedStatus(CAMERA_ID);
+        if (mounted) {
+          setSupervisedMode(Boolean(result?.supervised_mode));
+        }
+      } catch (error) {
+        console.log(
+          `[SupervisedMode] load failed: ${error?.message || "Unknown error"}`,
+        );
+      }
+    };
+
+    loadSupervisedMode();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
 
   const handleCameraWebViewFail = useCallback(async () => {
     if (!cameraBaseUrl) return;
@@ -661,6 +719,40 @@ export default function HomeScreen({ navigation }) {
     }
   }, [supervisedLoading, supervisedMode]);
 
+  const captureSnapshot = useCallback(async () => {
+    if (snapshotLoading) return;
+    try {
+      setSnapshotLoading(true);
+      const result = await cameraModeAPI.captureSnapshot(CAMERA_ID, {
+        mode: "processed",
+        sendTelegram: true,
+      });
+      const snapshot = result?.snapshot || null;
+      const telegram = result?.telegram || {};
+
+      if (snapshot) {
+        setLatestSnapshot(snapshot);
+      }
+
+      if (telegram?.sent) {
+        Alert.alert("Snapshot thanh cong", "Da chup snapshot va gui Telegram.");
+      } else if (snapshot) {
+        Alert.alert(
+          "Snapshot thanh cong",
+          telegram?.reason
+            ? `Da chup snapshot, nhung gui Telegram that bai: ${telegram.reason}`
+            : "Da chup snapshot, nhung khong gui duoc Telegram.",
+        );
+      } else {
+        Alert.alert("Loi", "Khong nhan duoc du lieu snapshot tu backend.");
+      }
+    } catch (err) {
+      Alert.alert("Loi snapshot", err?.message || "Khong the chup snapshot.");
+    } finally {
+      setSnapshotLoading(false);
+    }
+  }, [snapshotLoading]);
+
   const initial = user
     ? (
         user.full_name?.charAt(0) ||
@@ -676,9 +768,10 @@ export default function HomeScreen({ navigation }) {
       {/* Toast cảnh báo */}
       {toastVisible && (
         <Animated.View
-          pointerEvents="none"
+          {...(Platform.OS !== "web" ? { pointerEvents: "none" } : {})}
           style={[
             styles.alertToast,
+            Platform.OS === "web" ? { pointerEvents: "none" } : null,
             {
               opacity: toastAnim,
               transform: [
@@ -831,6 +924,43 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
 
         {/* ── THỜI TIẾT THỰC ──────────────────────────── */}
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={styles.snapshotBtn}
+          onPress={() => requireAuth(captureSnapshot)}
+          disabled={snapshotLoading}
+        >
+          {snapshotLoading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.snapshotBtnText}>{"Capture Snapshot"}</Text>
+          )}
+        </TouchableOpacity>
+
+        {latestSnapshot?.image_url ? (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            style={styles.snapshotCard}
+            onPress={() => setShowSnapshotModal(true)}
+          >
+            <Image
+              source={{ uri: latestSnapshot.image_url }}
+              style={styles.snapshotPreview}
+            />
+            <View style={styles.snapshotMeta}>
+              <Text style={styles.snapshotTitle}>{"Snapshot moi nhat"}</Text>
+              <Text style={styles.snapshotSubtitle}>
+                {latestSnapshot.mode === "raw"
+                  ? "Anh goc tu camera"
+                  : "Anh da xu ly voi overlay"}
+              </Text>
+              <Text style={styles.snapshotTimestamp}>
+                {formatSnapshotTime(latestSnapshot.captured_at) || "--"}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
+
         <WeatherCard />
 
         {/* ── CẢNH BÁO GẦN ĐÂY ───────────────────────── */}
@@ -897,6 +1027,33 @@ export default function HomeScreen({ navigation }) {
         activeTab="Home"
         requireAuth={requireAuth}
       />
+
+      <Modal
+        visible={showSnapshotModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSnapshotModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.snapshotModalBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowSnapshotModal(false)}
+        >
+          <View style={styles.snapshotModalCard}>
+            {latestSnapshot?.image_url ? (
+              <Image
+                source={{ uri: latestSnapshot.image_url }}
+                style={styles.snapshotModalImage}
+                resizeMode="contain"
+              />
+            ) : null}
+            <Text style={styles.snapshotModalTitle}>{"Snapshot moi nhat"}</Text>
+            <Text style={styles.snapshotModalTime}>
+              {formatSnapshotTime(latestSnapshot?.captured_at) || "--"}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -916,10 +1073,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     maxWidth: "88%",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    ...createShadow(4, 8, 0.2, 6),
   },
   alertToastText: {
     color: "#FFF",
@@ -1033,10 +1187,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: BORDER,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    ...createShadow(2, 8, 0.04, 2),
   },
   cardSectionTitle: {
     fontSize: 11,
@@ -1145,10 +1296,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderRadius: 14,
     paddingVertical: 14,
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 3,
+    ...createShadow(3, 8, 0.12, 3),
   },
   alertStatusInner: {
     flexDirection: "row",
@@ -1177,6 +1325,83 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.6,
   },
+  snapshotBtn: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#0F766E",
+    ...createShadow(3, 10, 0.12, 3),
+  },
+  snapshotBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
+  snapshotCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: SURF,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...createShadow(2, 10, 0.08, 2),
+  },
+  snapshotPreview: {
+    width: "100%",
+    height: 180,
+    backgroundColor: "#E2E8F0",
+  },
+  snapshotMeta: {
+    padding: 14,
+    gap: 4,
+  },
+  snapshotTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: TEXT1,
+  },
+  snapshotSubtitle: {
+    fontSize: 12,
+    color: TEXT2,
+  },
+  snapshotTimestamp: {
+    fontSize: 11,
+    color: TEXT3,
+  },
+  snapshotModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.82)",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  snapshotModalCard: {
+    backgroundColor: SURF,
+    borderRadius: 18,
+    overflow: "hidden",
+  },
+  snapshotModalImage: {
+    width: "100%",
+    height: 320,
+    backgroundColor: "#0F172A",
+  },
+  snapshotModalTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: TEXT1,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+  },
+  snapshotModalTime: {
+    fontSize: 12,
+    color: TEXT2,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 16,
+  },
 
   // Dropdown
   modalOverlay: {
@@ -1191,10 +1416,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginLeft: "auto",
     minWidth: 220,
-    shadowColor: "#000",
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    elevation: 10,
+    ...createShadow(8, 16, 0.14, 10),
     overflow: "hidden",
   },
   dropdownUser: {

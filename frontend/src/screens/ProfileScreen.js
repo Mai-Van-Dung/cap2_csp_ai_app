@@ -9,6 +9,7 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -26,6 +27,17 @@ const BORDER = "#E2E8F0";
 const RED = "#EF4444";
 
 const TELEGRAM_STORAGE_KEY = "telegram_chat_id";
+
+const createShadow = (y, blur, opacity, elevation) =>
+  Platform.OS === "web"
+    ? { boxShadow: `0px ${y}px ${blur * 2}px rgba(0, 0, 0, ${opacity})` }
+    : {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: y },
+        shadowOpacity: opacity,
+        shadowRadius: blur,
+        elevation,
+      };
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -398,10 +410,7 @@ const styles = StyleSheet.create({
     backgroundColor: SURF,
     borderRadius: 14,
     padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...createShadow(2, 8, 0.05, 2),
   },
   rowDivider: { height: 1, backgroundColor: BORDER, marginVertical: 8 },
 
@@ -544,10 +553,7 @@ const styles = StyleSheet.create({
     backgroundColor: SURF,
     borderRadius: 14,
     padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...createShadow(2, 8, 0.05, 2),
   },
   stepsTitle: {
     fontSize: 14,

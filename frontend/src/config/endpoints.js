@@ -240,6 +240,7 @@ const normalizeConnectionInfo = ({
 
 const buildDiscoverySeedBaseUrls = () => {
   const hosts = getSeedHosts();
+  const nodePort = getNodePort();
   const explicitCameraBaseUrl = readEnv(
     "EXPO_PUBLIC_CAMERA_PUBLIC_BASE_URL",
     "VITE_CAMERA_PUBLIC_BASE_URL",
@@ -270,12 +271,22 @@ const buildDiscoverySeedBaseUrls = () => {
     [
       stripTrailingSlash(explicitBackendOrigin),
       stripTrailingSlash(explicitAlertsOrigin),
+      stripTrailingSlash(explicitPublicBaseUrl),
+      stripTrailingSlash(mapBaseToPort(explicitBackendBaseUrl, nodePort)),
+      stripTrailingSlash(mapBaseToPort(derivedApiBase, nodePort)),
+      stripTrailingSlash(mapBaseToPort(explicitPublicBaseUrl, nodePort)),
+      ...hosts.map((host) => `http://${host}:${nodePort}`),
+      ...buildHostCandidates({
+        port: nodePort,
+        includeLocalhost: Platform.OS === "web",
+      }),
+      // Legacy fallback for older setups that still expose discovery on camera/Flask.
       stripTrailingSlash(explicitCameraBaseUrl),
       stripTrailingSlash(
         mapBaseToPort(explicitBackendBaseUrl, DEFAULT_FLASK_PORT),
       ),
       stripTrailingSlash(mapBaseToPort(derivedApiBase, DEFAULT_FLASK_PORT)),
-      stripTrailingSlash(explicitPublicBaseUrl),
+      stripTrailingSlash(mapBaseToPort(explicitPublicBaseUrl, DEFAULT_FLASK_PORT)),
       ...hosts.map((host) => `http://${host}:${DEFAULT_FLASK_PORT}`),
       ...buildHostCandidates({
         port: DEFAULT_FLASK_PORT,
@@ -509,6 +520,7 @@ export const getCameraBaseCandidates = () => {
     "EXPO_PUBLIC_CAMERA_BASE_URL",
     "VITE_CAMERA_BASE_URL",
   );
+  const nodePort = getNodePort();
   const candidates = [...getDiscoveredBaseCandidates()];
 
   if (explicitCameraBaseUrl) {
@@ -564,7 +576,20 @@ export const getCameraBaseCandidates = () => {
     }),
   );
 
-  return unique(candidates.map((u) => stripTrailingSlash(u)));
+  return unique(
+    candidates
+      .map((u) => stripTrailingSlash(u))
+      .filter((u) => {
+        if (!isHttpUrl(u)) return false;
+        try {
+          const parsed = new URL(u);
+          return parsed.port === String(DEFAULT_FLASK_PORT);
+        } catch {
+          return false;
+        }
+      })
+      .filter((u) => !u.includes(`:${nodePort}`)),
+  );
 };
 
 export const getSocketBaseCandidates = () => {

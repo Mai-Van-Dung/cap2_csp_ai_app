@@ -23,6 +23,17 @@ const TEXT2 = "#475569";
 const TEXT3 = "#94A3B8";
 const BORDER = "#E2E8F0";
 
+const createShadow = (y, blur, opacity, elevation) =>
+  Platform.OS === "web"
+    ? { boxShadow: `0px ${y}px ${blur * 2}px rgba(0, 0, 0, ${opacity})` }
+    : {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: y },
+        shadowOpacity: opacity,
+        shadowRadius: blur,
+        elevation,
+      };
+
 const Field = ({
   label,
   value,
@@ -236,10 +247,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: BORDER,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
+    ...createShadow(2, 10, 0.05, 2),
   },
   fieldWrap: {
     marginBottom: 14,

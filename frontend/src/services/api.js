@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
+  getCameraBaseCandidates,
   getApiBaseCandidates,
   refreshConnectionInfo,
 } from "../config/endpoints";
@@ -7,6 +8,49 @@ import { getAlertsApiBaseCandidates } from "../config/endpoints";
 
 let preferredBaseUrl = null;
 let unauthorizedHandler = null;
+
+const stripTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");
+const unique = (items) => [...new Set(items.filter(Boolean))];
+
+const buildPreferredApiCandidates = (baseUrl, candidateSource) => {
+  const normalizedBase = stripTrailingSlash(baseUrl);
+  if (!normalizedBase) return [];
+
+  let parsedBase;
+  try {
+    parsedBase = new URL(normalizedBase);
+  } catch {
+    return [];
+  }
+
+  const directApiBase = `${normalizedBase}/api`;
+  const prioritized = [];
+
+  if (candidateSource.includes(normalizedBase)) {
+    prioritized.push(normalizedBase);
+  }
+
+  if (candidateSource.includes(directApiBase)) {
+    prioritized.push(directApiBase);
+  }
+
+  for (const candidate of candidateSource) {
+    try {
+      const parsedCandidate = new URL(candidate);
+      const isSameHost =
+        parsedCandidate.protocol === parsedBase.protocol &&
+        parsedCandidate.hostname === parsedBase.hostname;
+
+      if (isSameHost) {
+        prioritized.push(candidate);
+      }
+    } catch {
+      // Ignore invalid candidate entries and continue probing the rest.
+    }
+  }
+
+  return unique(prioritized);
+};
 
 export const setUnauthorizedHandler = (handler) => {
   unauthorizedHandler = typeof handler === "function" ? handler : null;
@@ -31,6 +75,12 @@ const getStoredToken = async () => {
   return "";
 };
 
+const getStoredTelegramChatId = async () => {
+  const raw = await AsyncStorage.getItem("telegram_chat_id");
+  if (typeof raw !== "string") return "";
+  return raw.trim();
+};
+
 const fetchWithTimeout = async (url, options, timeoutMs = 8000) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -40,6 +90,69 @@ const fetchWithTimeout = async (url, options, timeoutMs = 8000) => {
   } finally {
     clearTimeout(timer);
   }
+};
+
+const buildAbsoluteUrls = (bases, path) => {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return unique(
+    (Array.isArray(bases) ? bases : []).map((base) => {
+      const normalizedBase = stripTrailingSlash(base);
+      return normalizedBase ? `${normalizedBase}${normalizedPath}` : "";
+    }),
+  );
+};
+
+const requestAbsolute = async (
+  urls,
+  method = "GET",
+  body = null,
+  { auth = false, timeoutMs = 8000 } = {},
+) => {
+  const headers = {};
+
+  if (auth) {
+    const token = await getStoredToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  }
+
+  const options = { method, headers };
+  if (body) {
+    headers["Content-Type"] = "application/json";
+    options.body = JSON.stringify(body);
+  }
+
+  let lastNetworkError = null;
+  let lastHttpError = null;
+
+  for (const url of urls) {
+    try {
+      const response = await fetchWithTimeout(url, options, timeoutMs);
+      let data = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+
+      if (response.ok) {
+        return data ?? {};
+      }
+
+      lastHttpError = new Error(
+        data?.message || data?.error || `API loi (${response.status})`,
+      );
+    } catch (error) {
+      lastNetworkError = error;
+    }
+  }
+
+  if (lastHttpError) throw lastHttpError;
+  if (lastNetworkError?.name === "AbortError") {
+    throw new Error("Ket noi supervised mode bi timeout.");
+  }
+  throw new Error("Khong the ket noi endpoint supervised mode.");
 };
 
 // ── Helper gọi API ────────────────────────────────────────
@@ -84,12 +197,11 @@ const request = async (endpoint, method = "GET", body = null, auth = false) => {
     : getApiBaseCandidates();
   console.log(`[API] endpoint=${endpoint}, isAlerts=${isAlertsEndpoint}`);
 
-  const candidates = preferredBaseUrl
-    ? [
-        preferredBaseUrl,
-        ...candidateSource.filter((u) => u !== preferredBaseUrl),
-      ]
-    : candidateSource;
+  const preferredCandidates = buildPreferredApiCandidates(
+    preferredBaseUrl,
+    candidateSource,
+  );
+  const candidates = unique([...preferredCandidates, ...candidateSource]);
 
   console.log(
     `[API] endpoint=${endpoint}, method=${method}, candidates=[${candidates.slice(0, 2).join(", ")}...]`,
@@ -226,9 +338,60 @@ export const telegramAPI = {
 
 // ── Camera mode APIs ─────────────────────────────────────
 export const cameraModeAPI = {
-  toggleSupervised: (cameraId, enabled) =>
-    request("/api/camera/toggle-supervised", "POST", {
+  getSupervisedStatus: async (cameraId) => {
+    const nodeUrls = buildAbsoluteUrls(
+      getApiBaseCandidates(),
+      `/camera/supervised-status/${cameraId}`,
+    );
+    return requestAbsolute(nodeUrls, "GET", null, { auth: true });
+  },
+
+  toggleSupervised: async (cameraId, enabled) => {
+    const body = {
       camera_id: cameraId,
       enabled,
-    }),
+    };
+
+    const flaskUrls = buildAbsoluteUrls(
+      getCameraBaseCandidates(),
+      "/api/camera/toggle-supervised",
+    );
+    const nodeUrls = buildAbsoluteUrls(
+      getApiBaseCandidates(),
+      "/camera/toggle-supervised",
+    );
+
+    return requestAbsolute([...flaskUrls, ...nodeUrls], "POST", body, {
+      auth: true,
+    });
+  },
+
+  captureSnapshot: async (
+    cameraId,
+    { mode = "processed", sendTelegram = true, telegramChatId = "" } = {},
+  ) => {
+    const normalizedMode = mode === "raw" ? "raw" : "processed";
+    const resolvedChatId = telegramChatId || (await getStoredTelegramChatId());
+    const query = new URLSearchParams({
+      mode: normalizedMode,
+      send_telegram: sendTelegram ? "true" : "false",
+    });
+
+    const body = {
+      mode: normalizedMode,
+      send_telegram: Boolean(sendTelegram),
+    };
+
+    if (resolvedChatId) {
+      query.set("telegram_chat_id", resolvedChatId);
+      body.telegram_chat_id = resolvedChatId;
+    }
+
+    const flaskUrls = buildAbsoluteUrls(
+      getCameraBaseCandidates(),
+      `/api/cameras/${cameraId}/snapshot?${query.toString()}`,
+    );
+
+    return requestAbsolute(flaskUrls, "POST", body, { auth: true, timeoutMs: 12000 });
+  },
 };
